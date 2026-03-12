@@ -3,8 +3,6 @@ import { supabase } from '../lib/supabase';
 import { SYSTEM_PROMPT_IMAGE, SYSTEM_PROMPT_TEXT } from '../lib/constants';
 import { getFileType, getFileIcon, ACCEPTED, generatePreview, imageToBase64, pdfToBase64Image, wordToText, excelToText } from '../lib/fileUtils';
 
-const API_KEY = process.env.REACT_APP_ANTHROPIC_API_KEY || '';
-
 export default function UploadPage({ user, profile, onNavigate }) {
   const [pendingFiles,    setPendingFiles]    = useState([]);
   const [note,            setNote]            = useState('');
@@ -83,9 +81,9 @@ export default function UploadPage({ user, profile, onNavigate }) {
       messageContent = [{ type:'text', text:`${SYSTEM_PROMPT_TEXT}\n\n--- FICHIER ---\n${text.slice(0,8000)}` }];
     }
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('/api/analyze', {
       method:'POST',
-      headers: { 'Content-Type':'application/json', 'x-api-key':API_KEY, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-api-access':'true' },
+      headers: { 'Content-Type':'application/json' },
       body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user', content:messageContent}] }),
     });
     if (!resp.ok) throw new Error(`API error ${resp.status}`);
