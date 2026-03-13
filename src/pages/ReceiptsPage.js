@@ -40,8 +40,18 @@ export default function ReceiptsPage({ user, profile }) {
   useEffect(() => { loadReceipts(); }, []); // eslint-disable-line
 
   // ── Mise à jour statut ────────────────────────────────────────────────────────
+  const deleteReceipt = async (id) => {
+  if (!window.confirm('Supprimer ce reçu ?')) return;
+  await supabase.from('receipts').delete().eq('id', id);
+  setReceipts(prev => prev.filter(r => r.id !== id));
+  setSelected(null);
+};
   const updateStatut = async (id, statut) => {
-    await supabase.from('receipts').update({ statut, updated_by: user.id }).eq('id', id);
+    await supabase.from('receipts').update({ 
+  statut, 
+  updated_by: user.id,
+  approbateur_nom: `${profile.prenom} ${profile.nom}`
+}).eq('id', id);
     setReceipts(prev => prev.map(r => r.id === id ? { ...r, statut } : r));
     if (selected?.id === id) setSelected(s => ({ ...s, statut }));
   };
@@ -113,6 +123,12 @@ export default function ReceiptsPage({ user, profile }) {
         <button onClick={() => setSelected(null)}
           style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 10, color: '#94a3b8', padding: '9px 18px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 20 }}>
           ← Retour
+            {(isAdmin || selected.user_id === user.id) && (
+  <button onClick={() => deleteReceipt(selected.id)}
+    style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', borderRadius:10, color:'#f87171', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit', marginBottom:20, marginLeft:8 }}>
+    🗑 Supprimer
+  </button>
+)}
         </button>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
