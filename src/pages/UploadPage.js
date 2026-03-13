@@ -117,25 +117,31 @@ export default function UploadPage({ user, profile, onNavigate }) {
         const fileUrl   = await uploadFile(item.file, receiptId);
 
         await supabase.from('receipts').insert({
-          id:           receiptId,
-          user_id:      user.id,
-          employe_nom:  `${profile.prenom} ${profile.nom}`,
-          fournisseur:  result.fournisseur,
-          date:         result.date,
-          montant:      result.montant,
-          devise:       result.devise,
-          categorie:    result.categorie,
-          description:  result.description,
-          items:        result.items,
-          taxes:        result.taxes,
-          numero_recu:  result.numero_recu,
-          note:         note || '',
-          file_url:     fileUrl,
-          file_type:    item.fileType,
-          file_name:    item.file.name,
-          preview_url:  item.previewUrl,
-          statut:       'En attente',
-        });
+          await supabase.from('receipts').insert({
+  id:           receiptId,
+  user_id:      user.id,
+  employe_nom:  `${profile.prenom} ${profile.nom}`,
+  fournisseur:  result.fournisseur,
+  date:         result.date,
+  montant:      result.montant,
+  montant_ht:   result.montant_ht   ?? result.montant ?? 0,
+  tps:          result.tps          ?? 0,
+  tvq:          result.tvq          ?? 0,
+  montant_ttc:  result.montant_ttc  ?? result.montant ?? 0,
+  devise:       result.devise,
+  categorie:    result.categorie,
+  description:  result.description,
+  items:        result.items,
+  taxes:        result.taxes,
+  numero_recu:  result.numero_recu,
+  numero_projet: result.numero_projet ?? '',
+  note:         note || '',
+  file_url:     fileUrl,
+  file_type:    item.fileType,
+  file_name:    item.file.name,
+  preview_url:  item.previewUrl,
+  statut:       'En attente',
+});
 
         setDoneCount(c => c+1);
         setPendingFiles(prev => prev.map(p => p.id===item.id ? {...p,status:'done'} : p));
