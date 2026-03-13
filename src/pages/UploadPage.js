@@ -115,7 +115,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
         const result    = await analyzeOne(item);
         const receiptId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const fileUrl   = await uploadFile(item.file, receiptId);
-
         await supabase.from('receipts').insert({
   id:           receiptId,
   user_id:      user.id,
