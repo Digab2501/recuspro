@@ -6,14 +6,20 @@ import UploadPage    from './pages/UploadPage';
 import ReceiptsPage  from './pages/ReceiptsPage';
 import AdminPage     from './pages/AdminPage';
 import { ROLE_LABELS, ROLE_COLORS } from './lib/constants';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 export default function App() {
   const [session,  setSession]  = useState(null);
   const [profile,  setProfile]  = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [page,     setPage]     = useState('dashboard');
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
+    const hash = window.location.hash;
+if (hash.includes('type=recovery')) {
+  setIsResetting(true);
+}
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) loadProfile(session.user.id);
@@ -53,6 +59,9 @@ export default function App() {
     setPage('dashboard');
   };
 
+  if (isResetting) return (
+  <ResetPasswordPage onDone={() => { setIsResetting(false); window.location.hash = ''; }} />
+);
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#0f1117', display: 'grid', placeItems: 'center' }}>
       <div style={{ textAlign: 'center' }}>
