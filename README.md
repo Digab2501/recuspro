@@ -161,3 +161,4 @@ Vous obtenez une URL : `https://recuspro-xxxx.vercel.app`
 **"relation profiles does not exist"** → Relancez le script `supabase_setup.sql`
 
 **Caméra ne s'ouvre pas** → Sur iOS, utilisez Safari (pas Chrome)
+Mise à jour v2 - nouvelles catégories
