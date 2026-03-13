@@ -117,7 +117,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
         const fileUrl   = await uploadFile(item.file, receiptId);
 
         await supabase.from('receipts').insert({
-          await supabase.from('receipts').insert({
   id:           receiptId,
   user_id:      user.id,
   employe_nom:  `${profile.prenom} ${profile.nom}`,
