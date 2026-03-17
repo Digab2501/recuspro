@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { CATEGORIES, STATUTS, MOIS_LABELS, TPS_RATE, TVQ_RATE } from '../lib/constants';
+import { CATEGORIES, STATUTS, TPS_RATE, TVQ_RATE } from '../lib/constants';
 import { getFileIcon } from '../lib/fileUtils';
 
 const calcTaxes = (r) => {
@@ -21,8 +21,8 @@ export default function ReceiptsPage({ user, profile }) {
   const [editForm,    setEditForm]    = useState({});
   const [filterCat,   setFilterCat]   = useState('Toutes');
   const [filterStat,  setFilterStat]  = useState('Tous');
-  const [filterMonth, setFilterMonth] = useState('');
-  const [filterYear,  setFilterYear]  = useState('');
+  const [filterDateDe, setFilterDateDe] = useState('');
+const [filterDateA,  setFilterDateA]  = useState('');
 
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
@@ -88,19 +88,17 @@ export default function ReceiptsPage({ user, profile }) {
     const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' }));
-    a.download = `depenses_${filterYear||'tout'}${filterMonth?`-${String(filterMonth).padStart(2,'0')}`:''}.csv`;
+    a.download = `depenses_${filterDateDe||'debut'}_${filterDateA||'fin'}.csv`;
     a.click();
   };
 
-  const availableYears = [...new Set(receipts.map(r => r.date?.slice(0,4)).filter(Boolean))].sort((a,b) => b-a);
-
   const filtered = receipts.filter(r => {
-    if (filterCat  !== 'Toutes' && r.categorie !== filterCat)  return false;
-    if (filterStat !== 'Tous'   && r.statut    !== filterStat) return false;
-    if (filterYear  && !r.date?.startsWith(filterYear))        return false;
-    if (filterMonth && r.date?.slice(5,7) !== String(filterMonth).padStart(2,'0')) return false;
-    return true;
-  });
+  if (filterCat    !== 'Toutes' && r.categorie !== filterCat)  return false;
+  if (filterStat   !== 'Tous'   && r.statut    !== filterStat) return false;
+  if (filterDateDe && r.date    <  filterDateDe)               return false;
+  if (filterDateA  && r.date    >  filterDateA)                return false;
+  return true;
+});
 
   const totaux = filtered.reduce((acc,r) => {
     const { ht, tps, tvq, ttc } = calcTaxes(r);
@@ -328,16 +326,16 @@ export default function ReceiptsPage({ user, profile }) {
       {/* Filtres période */}
       <div style={{ background:'#1a1f2e', border:'1px solid rgba(255,255,255,.06)', borderRadius:12, padding:'14px 18px', marginBottom:16, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
         <span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>📅 Période :</span>
-        <select value={filterYear} onChange={e => { setFilterYear(e.target.value); setFilterMonth(''); }} style={inputStyle}>
-          <option value="">Toutes les années</option>
-          {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} disabled={!filterYear} style={{ ...inputStyle, opacity: filterYear ? 1 : .4 }}>
-          <option value="">Tous les mois</option>
-          {MOIS_LABELS.map((m, i) => <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>)}
-        </select>
-        {(filterYear || filterMonth) && (
-          <button onClick={() => { setFilterYear(''); setFilterMonth(''); }}
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <label style={{ fontSize:12, color:'#64748b' }}>De :</label>
+          <input type="date" value={filterDateDe} onChange={e => setFilterDateDe(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <label style={{ fontSize:12, color:'#64748b' }}>À :</label>
+          <input type="date" value={filterDateA} onChange={e => setFilterDateA(e.target.value)} style={inputStyle} />
+        </div>
+        {(filterDateDe || filterDateA) && (
+          <button onClick={() => { setFilterDateDe(''); setFilterDateA(''); }}
             style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', color:'#f87171', borderRadius:8, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
             ✕ Réinitialiser
           </button>
