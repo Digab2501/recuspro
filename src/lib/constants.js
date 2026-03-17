@@ -13,19 +13,8 @@ export const CATEGORIES = {
   'Licence':                     { icon: '📜', color: '#a855f7', requiresProject: false },
   'Communications':              { icon: '📡', color: '#06b6d4', requiresProject: false },
   'Entretien de l\'immeuble':    { icon: '🏢', color: '#84cc16', requiresProject: false },
- 'Abonnement':                  { icon: '🔄', color: '#8b5cf6', requiresProject: false },
-```
-
-Aussi dans les deux prompts IA, trouvez la liste des catégories et ajoutez `Abonnement` :
-
-Trouvez :
-```
-Licence, Communications, Entretien de l'immeuble, Autres
-```
-
-Remplacez par :
-```
-Licence, Communications, Entretien de l'immeuble, Abonnement, Autres 'Autres':                      { icon: '📋', color: '#94a3b8', requiresProject: false },
+  'Abonnement':                  { icon: '🔄', color: '#3b82f6', requiresProject: false },
+  'Autres':                      { icon: '📋', color: '#94a3b8', requiresProject: false },
 };
 
 export const CATEGORIES_WITH_PROJECT = Object.entries(CATEGORIES)
@@ -33,8 +22,8 @@ export const CATEGORIES_WITH_PROJECT = Object.entries(CATEGORIES)
   .map(([k]) => k);
 
 // ─── Taux de taxes (Québec) ────────────────────────────────────────────────────
-export const TPS_RATE  = 0.05;   // 5 %
-export const TVQ_RATE  = 0.09975; // 9.975 %
+export const TPS_RATE  = 0.05;
+export const TVQ_RATE  = 0.09975;
 
 // ─── Rôles ────────────────────────────────────────────────────────────────────
 export const ROLES = {
@@ -75,7 +64,7 @@ Analyse ce document (reçu, facture ou note de frais) et extrais les information
   "tvq": number ou null (TVQ si visible sur le reçu),
   "montant_ttc": number (montant total toutes taxes comprises),
   "devise": "CAD ou USD ou EUR ou autre",
-  "categorie": "l'une de ces catégories exactes: Déplacement chantier, Achat matériaux, Location équipement, Formation, Essence, Entretien et réparation, Déplacement administratif, Repas, Fournitures de bureau, Dépenses informatiques, Licence, Communications, Entretien de l'immeuble, Autres",
+  "categorie": "l'une de ces catégories exactes: Déplacement chantier, Achat matériaux, Location équipement, Formation, Essence, Entretien et réparation, Déplacement administratif, Repas, Fournitures de bureau, Dépenses informatiques, Licence, Communications, Entretien de l'immeuble, Abonnement, Autres",
   "numero_projet": "numéro de projet si visible sur le reçu, sinon null",
   "description": "brève description de l'achat en 1-2 phrases",
   "items": [{"nom": "...", "montant": number}],
@@ -93,7 +82,7 @@ Voici le contenu textuel extrait d'un document. Extrais les informations en JSON
   "tvq": number ou null (TVQ 9.975% si visible),
   "montant_ttc": number (montant total toutes taxes comprises),
   "devise": "CAD ou USD ou EUR ou autre",
-  "categorie": "l'une de ces catégories exactes: Déplacement chantier, Achat matériaux, Location équipement, Formation, Essence, Entretien et réparation, Déplacement administratif, Repas, Fournitures de bureau, Dépenses informatiques, Licence, Communications, Entretien de l'immeuble, Autres",
+  "categorie": "l'une de ces catégories exactes: Déplacement chantier, Achat matériaux, Location équipement, Formation, Essence, Entretien et réparation, Déplacement administratif, Repas, Fournitures de bureau, Dépenses informatiques, Licence, Communications, Entretien de l'immeuble, Abonnement, Autres",
   "numero_projet": "numéro de projet si visible, sinon null",
   "description": "brève description de l'achat en 1-2 phrases",
   "items": [{"nom": "...", "montant": number}],
