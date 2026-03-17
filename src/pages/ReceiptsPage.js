@@ -88,7 +88,7 @@ export default function ReceiptsPage({ user, profile }) {
     const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' }));
-    a.download = `depenses_${filterYear||'tout'}${filterMonth?`-${String(filterMonth).padStart(2,'0')}`:''}`.csv`;
+    a.download = `depenses_${filterYear||'tout'}${filterMonth?`-${String(filterMonth).padStart(2,'0')}`:''}.csv`;
     a.click();
   };
 
