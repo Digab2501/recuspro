@@ -13,7 +13,19 @@ export const CATEGORIES = {
   'Licence':                     { icon: '📜', color: '#a855f7', requiresProject: false },
   'Communications':              { icon: '📡', color: '#06b6d4', requiresProject: false },
   'Entretien de l\'immeuble':    { icon: '🏢', color: '#84cc16', requiresProject: false },
-  'Autres':                      { icon: '📋', color: '#94a3b8', requiresProject: false },
+ 'Abonnement':                  { icon: '🔄', color: '#8b5cf6', requiresProject: false },
+```
+
+Aussi dans les deux prompts IA, trouvez la liste des catégories et ajoutez `Abonnement` :
+
+Trouvez :
+```
+Licence, Communications, Entretien de l'immeuble, Autres
+```
+
+Remplacez par :
+```
+Licence, Communications, Entretien de l'immeuble, Abonnement, Autres 'Autres':                      { icon: '📋', color: '#94a3b8', requiresProject: false },
 };
 
 export const CATEGORIES_WITH_PROJECT = Object.entries(CATEGORIES)
