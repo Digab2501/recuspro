@@ -11,7 +11,7 @@ const calcTaxes = (r) => {
   return { ht, tps, tvq, ttc };
 };
 
-const fmt = (n) => Number(n || 0).toFixed(2);
+const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {    minimumFractionDigits: 2,    maximumFractionDigits: 2  });;
 
 export default function ReceiptsPage({ user, profile }) {
   const [receipts,    setReceipts]    = useState([]);
