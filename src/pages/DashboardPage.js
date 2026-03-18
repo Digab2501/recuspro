@@ -9,7 +9,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
 const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  });
   useEffect(() => {
     const load = async () => {
       let q = supabase.from('receipts').select('*').order('created_at', { ascending:false });
@@ -18,6 +17,18 @@ const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
       setReceipts(data || []);
       setLoading(false);
     };
+    load();
+
+    const channel = supabase
+      .channel('dashboard-receipts')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'receipts' },
+        () => { load(); }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [isManager, user.id]);
     load();
   }, [isManager, user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
