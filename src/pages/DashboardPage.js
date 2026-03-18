@@ -6,9 +6,12 @@ export default function DashboardPage({ user, profile, onNavigate }) {
   const [receipts, setReceipts] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const isManager = profile.role === 'manager' || profile.role === 'admin';
-const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
+
+  const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
+  });
+
   useEffect(() => {
     const load = async () => {
       let q = supabase.from('receipts').select('*').order('created_at', { ascending:false });
