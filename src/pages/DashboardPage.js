@@ -6,7 +6,10 @@ export default function DashboardPage({ user, profile, onNavigate }) {
   const [receipts, setReceipts] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const isManager = profile.role === 'manager' || profile.role === 'admin';
-
+const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
   useEffect(() => {
     const load = async () => {
       let q = supabase.from('receipts').select('*').order('created_at', { ascending:false });
@@ -45,8 +48,8 @@ export default function DashboardPage({ user, profile, onNavigate }) {
       {/* Stats cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:16,marginBottom:28}}>
         {[
-          {label:'Total',        value:`${total.toFixed(2)} $`,     sub:`${receipts.length} reçu(s)`,     color:'#6366f1'},
-          {label:'Ce mois',      value:`${monthTotal.toFixed(2)} $`, sub:'Mois courant',                   color:'#10b981'},
+          {label:'Total',        value:`${fmt(total)} $`     sub:`${receipts.length} reçu(s)`,     color:'#6366f1'},
+          {label:'Ce mois',      value:`${fmt(monthTotal)} $` , sub:'Mois courant',                   color:'#10b981'},
           {label:'En attente',   value:pending,                      sub:'À valider',                      color:'#f59e0b'},
           {label:'Approuvés',    value:approved,                     sub:'Ce mois',                        color:'#0ea5e9'},
         ].map(c=>(
@@ -68,7 +71,7 @@ export default function DashboardPage({ user, profile, onNavigate }) {
               <div key={cat} style={{marginBottom:12}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                   <span style={{fontSize:12}}>{CATEGORIES[cat].icon} {cat}</span>
-                  <span style={{fontSize:12,fontWeight:700,color:CATEGORIES[cat].color}}>{amt.toFixed(0)} $</span>
+                  <span style={{fontSize:12,fontWeight:700,color:CATEGORIES[cat].color}}>{fmt(amt)} $</span>
                 </div>
                 <div style={{height:4,background:'rgba(255,255,255,.05)',borderRadius:99}}>
                   <div style={{height:'100%',borderRadius:99,background:CATEGORIES[cat].color,width:`${pct}%`,transition:'width .6s'}} />
@@ -90,7 +93,7 @@ export default function DashboardPage({ user, profile, onNavigate }) {
                   <div style={{fontSize:11,color:'#475569'}}>{r.employe_nom} · {r.date||'—'}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:13,fontWeight:700,color:'#a5b4fc',fontFamily:"'DM Mono',monospace"}}>{Number(r.montant||0).toFixed(2)} $</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#a5b4fc',fontFamily:"'DM Mono',monospace"}}>{fmt(r.montant)} $</div>
                   <div style={{fontSize:11,fontWeight:600,color:statColor(r.statut)}}>{r.statut}</div>
                 </div>
               </div>
