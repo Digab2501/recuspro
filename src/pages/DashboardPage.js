@@ -32,8 +32,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
 
     return () => supabase.removeChannel(channel);
   }, [isManager, user.id]);
-    load();
-  }, [isManager, user.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total      = receipts.reduce((s,r)=>s+(r.montant||0),0);
   const thisMonth  = new Date().toISOString().slice(0,7);
@@ -43,7 +41,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
 
   const totals = receipts.reduce((acc,r)=>{ acc[r.categorie]=(acc[r.categorie]||0)+(r.montant||0); return acc; }, {});
 
-  // Recent 5
   const recent = receipts.slice(0,5);
 
   const statColor = (s) => ({
@@ -59,13 +56,12 @@ export default function DashboardPage({ user, profile, onNavigate }) {
         {isManager ? 'Vue d\'ensemble de toutes les dépenses' : 'Vos dépenses personnelles'}
       </p>
 
-      {/* Stats cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:16,marginBottom:28}}>
         {[
-          {label:'Total',        value:`${fmt(total)} $` ,    sub:`${receipts.length} reçu(s)`,     color:'#6366f1'},
-          {label:'Ce mois',      value:`${fmt(monthTotal)} $` , sub:'Mois courant',                   color:'#10b981'},
-          {label:'En attente',   value:pending,                      sub:'À valider',                      color:'#f59e0b'},
-          {label:'Approuvés',    value:approved,                     sub:'Ce mois',                        color:'#0ea5e9'},
+          {label:'Total',      value:`${fmt(total)} $`,      sub:`${receipts.length} reçu(s)`, color:'#6366f1'},
+          {label:'Ce mois',    value:`${fmt(monthTotal)} $`, sub:'Mois courant',               color:'#10b981'},
+          {label:'En attente', value:pending,                sub:'À valider',                  color:'#f59e0b'},
+          {label:'Approuvés',  value:approved,               sub:'Ce mois',                    color:'#0ea5e9'},
         ].map(c=>(
           <div key={c.label} style={{background:'#1a1f2e',borderRadius:14,border:'1px solid rgba(255,255,255,.06)',padding:20}}>
             <div style={{fontSize:10,color:'#475569',fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>{c.label}</div>
@@ -76,7 +72,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
-        {/* Categories chart */}
         <div style={{background:'#1a1f2e',borderRadius:14,border:'1px solid rgba(255,255,255,.06)',padding:20}}>
           <h2 style={{fontSize:14,fontWeight:700,marginBottom:18}}>Par catégorie</h2>
           {Object.keys(CATEGORIES).map(cat=>{
@@ -95,7 +90,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
           })}
         </div>
 
-        {/* Recent receipts */}
         <div style={{background:'#1a1f2e',borderRadius:14,border:'1px solid rgba(255,255,255,.06)',padding:20}}>
           <h2 style={{fontSize:14,fontWeight:700,marginBottom:18}}>Récents</h2>
           {recent.length===0
@@ -121,7 +115,6 @@ export default function DashboardPage({ user, profile, onNavigate }) {
         </div>
       </div>
 
-      {/* Quick actions */}
       <div style={{background:'#1a1f2e',borderRadius:14,border:'1px solid rgba(255,255,255,.06)',padding:20}}>
         <h2 style={{fontSize:14,fontWeight:700,marginBottom:16}}>Actions rapides</h2>
         <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
