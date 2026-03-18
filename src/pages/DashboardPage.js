@@ -13,25 +13,30 @@ export default function DashboardPage({ user, profile, onNavigate }) {
   });
 
   useEffect(() => {
-    const load = async () => {
-      let q = supabase.from('receipts').select('*').order('created_at', { ascending:false });
-      if (!isManager) q = q.eq('user_id', user.id);
-      const { data } = await q;
-      setReceipts(data || []);
-      setLoading(false);
-    };
-    load();
+  const load = async () => {
+    let q = supabase.from('receipts').select('*').order('created_at', { ascending:false });
+    if (!isManager) q = q.eq('user_id', user.id);
+    const { data } = await q;
+    setReceipts(data || []);
+    setLoading(false);
+  };
+  load();
 
-    const channel = supabase
-      .channel('dashboard-receipts')
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'receipts' },
-        () => { load(); }
-      )
-      .subscribe();
+  const channel = supabase
+    .channel('dashboard-receipts')
+    .on('postgres_changes',
+      { event: '*', schema: 'public', table: 'receipts' },
+      () => { load(); }
+    )
+    .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [isManager, user.id]);
+  const interval = setInterval(load, 30000);
+
+  return () => {
+    supabase.removeChannel(channel);
+    clearInterval(interval);
+  };
+}, [isManager, user.id]);
 
   const total      = receipts.reduce((s,r)=>s+(r.montant||0),0);
   const thisMonth  = new Date().toISOString().slice(0,7);
