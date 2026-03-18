@@ -48,7 +48,7 @@ const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {
       {/* Stats cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:16,marginBottom:28}}>
         {[
-          {label:'Total',        value:`${fmt(total)} $`     sub:`${receipts.length} reçu(s)`,     color:'#6366f1'},
+          {label:'Total',        value:`${fmt(total)} $` ,    sub:`${receipts.length} reçu(s)`,     color:'#6366f1'},
           {label:'Ce mois',      value:`${fmt(monthTotal)} $` , sub:'Mois courant',                   color:'#10b981'},
           {label:'En attente',   value:pending,                      sub:'À valider',                      color:'#f59e0b'},
           {label:'Approuvés',    value:approved,                     sub:'Ce mois',                        color:'#0ea5e9'},
