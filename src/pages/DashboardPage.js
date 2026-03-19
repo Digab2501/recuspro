@@ -38,13 +38,14 @@ export default function DashboardPage({ user, profile, onNavigate }) {
   };
 }, [isManager, user.id]);
 
-  const total      = receipts.reduce((s,r)=>s+(r.montant||0),0);
+  const amt        = (r) => r.montant_ttc || r.montant || 0;
+  const total      = receipts.reduce((s,r)=>s+amt(r),0);
   const thisMonth  = new Date().toISOString().slice(0,7);
-  const monthTotal = receipts.filter(r=>r.date?.startsWith(thisMonth)).reduce((s,r)=>s+(r.montant||0),0);
+  const monthTotal = receipts.filter(r=>r.date?.startsWith(thisMonth)).reduce((s,r)=>s+amt(r),0);
   const pending    = receipts.filter(r=>r.statut==='En attente').length;
   const approved   = receipts.filter(r=>r.statut==='Approuvé').length;
 
-  const totals = receipts.reduce((acc,r)=>{ acc[r.categorie]=(acc[r.categorie]||0)+(r.montant||0); return acc; }, {});
+  const totals = receipts.reduce((acc,r)=>{ acc[r.categorie]=(acc[r.categorie]||0)+amt(r); return acc; }, {});
 
   const recent = receipts.slice(0,5);
 
@@ -106,7 +107,7 @@ export default function DashboardPage({ user, profile, onNavigate }) {
                   <div style={{fontSize:11,color:'#475569'}}>{r.employe_nom} · {r.date||'—'}</div>
                 </div>
                 <div style={{textAlign:'right'}}>
-                  <div style={{fontSize:13,fontWeight:700,color:'#a5b4fc',fontFamily:"'DM Mono',monospace"}}>{fmt(r.montant)} $</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#a5b4fc',fontFamily:"'DM Mono',monospace"}}>{fmt(amt(r))} $</div>
                   <div style={{fontSize:11,fontWeight:600,color:statColor(r.statut)}}>{r.statut}</div>
                 </div>
               </div>
