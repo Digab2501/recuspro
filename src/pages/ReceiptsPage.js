@@ -33,7 +33,22 @@ const [filterDateA,  setFilterDateA]  = useState('');
     let query = supabase.from('receipts').select('*').order('date', { ascending: false });
     if (!isApprobateur) query = query.eq('user_id', user.id);
     const { data } = await query;
-    setReceipts(data || []);
+    
+    // Générer des liens signés pour chaque fichier
+    const receiptsWithUrls = await Promise.all((data || []).map(async (r) => {
+      if (r.file_url && r.file_url.includes('/storage/v1/object/')) {
+        const path = r.file_url.split('/receipts/')[1];
+        if (path) {
+          const { data: signed } = await supabase.storage
+            .from('receipts')
+            .createSignedUrl(path, 3600); // lien valide 1 heure
+          return { ...r, file_url: signed?.signedUrl || r.file_url };
+        }
+      }
+      return r;
+    }));
+    
+    setReceipts(receiptsWithUrls);
     setLoading(false);
   };
 
