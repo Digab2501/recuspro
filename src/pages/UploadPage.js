@@ -17,7 +17,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
   const fileRef       = useRef();
   const cameraFileRef = useRef();
 
-  // ── Camera ────────────────────────────────────────────────────────────────
   const openCamera = async (facing = 'environment') => {
     try {
       if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
@@ -42,7 +41,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
     canvas.toBlob(blob => addFiles([new File([blob], `photo_${Date.now()}.jpg`, {type:'image/jpeg'})]), 'image/jpeg', 0.92);
   };
 
-  // ── Files ─────────────────────────────────────────────────────────────────
   const addFiles = async (files) => {
     const valid = Array.from(files).filter(f => getFileType(f) !== 'unknown');
     if (!valid.length) return alert('Format non supporté. Formats acceptés : images, PDF, Word, Excel/CSV');
@@ -58,7 +56,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
 
   const removeFile = (id) => setPendingFiles(prev => prev.filter(p => p.id !== id));
 
-  // ── AI Analysis ───────────────────────────────────────────────────────────
   const analyzeOne = async (item) => {
     let messageContent;
     if (item.fileType === 'image') {
@@ -68,25 +65,24 @@ export default function UploadPage({ user, profile, onNavigate }) {
         { type:'text', text:SYSTEM_PROMPT_IMAGE },
       ];
     } else if (item.fileType === 'pdf') {
-  try {
-    const text = await wordToText(item.file);
-    if (text && text.trim().length > 50) {
-      messageContent = [{ type:'text', text:`${SYSTEM_PROMPT_TEXT}\n\n--- DOCUMENT ---\n${text.slice(0,8000)}` }];
-    } else {
-      const b64 = await pdfToBase64Image(item.file);
-      messageContent = [
-        { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
-        { type:'text', text:SYSTEM_PROMPT_IMAGE },
-      ];
-    }
-  } catch {
-    const b64 = await pdfToBase64Image(item.file);
-    messageContent = [
-      { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
-      { type:'text', text:SYSTEM_PROMPT_IMAGE },
-    ];
-  }
-      ];
+      try {
+        const text = await wordToText(item.file);
+        if (text && text.trim().length > 50) {
+          messageContent = [{ type:'text', text:`${SYSTEM_PROMPT_TEXT}\n\n--- DOCUMENT ---\n${text.slice(0,8000)}` }];
+        } else {
+          const b64 = await pdfToBase64Image(item.file);
+          messageContent = [
+            { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
+            { type:'text', text:SYSTEM_PROMPT_IMAGE },
+          ];
+        }
+      } catch {
+        const b64 = await pdfToBase64Image(item.file);
+        messageContent = [
+          { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
+          { type:'text', text:SYSTEM_PROMPT_IMAGE },
+        ];
+      }
     } else if (item.fileType === 'word') {
       const text = await wordToText(item.file);
       messageContent = [{ type:'text', text:`${SYSTEM_PROMPT_TEXT}\n\n--- DOCUMENT ---\n${text.slice(0,8000)}` }];
@@ -104,10 +100,9 @@ export default function UploadPage({ user, profile, onNavigate }) {
     const data = await resp.json();
     const txt  = data.content?.map(b=>b.text||'').join('') || '';
     try   { return JSON.parse(txt.replace(/```json|```/g,'').trim()); }
-    catch { return { fournisseur:'Inconnu', date:null, montant:0, devise:'CAD', categorie:'Autre', description:'Extraction échouée.', items:[], taxes:null, numero_recu:null }; }
+    catch { return { fournisseur:'Inconnu', date:null, montant:0, devise:'CAD', categorie:'Autres', description:'Extraction échouée.', items:[], taxes:null, numero_recu:null }; }
   };
 
-  // ── Upload file to Supabase Storage ───────────────────────────────────────
   const uploadFile = async (file, receiptId) => {
     const ext  = file.name.split('.').pop();
     const path = `${user.id}/${receiptId}.${ext}`;
@@ -117,7 +112,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
     return data.publicUrl;
   };
 
-  // ── Process all ──────────────────────────────────────────────────────────
   const processAll = async () => {
     const toProcess = pendingFiles.filter(p => p.status === 'pending');
     if (!toProcess.length) return;
@@ -130,31 +124,30 @@ export default function UploadPage({ user, profile, onNavigate }) {
         const receiptId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const fileUrl   = await uploadFile(item.file, receiptId);
         await supabase.from('receipts').insert({
-  id:           receiptId,
-  user_id:      user.id,
-  employe_nom:  `${profile.prenom} ${profile.nom}`,
-  fournisseur:  result.fournisseur,
-  date:         result.date,
-  montant:      result.montant,
-  montant_ht:   result.montant_ht   ?? result.montant ?? 0,
-  tps:          result.tps          ?? 0,
-  tvq:          result.tvq          ?? 0,
-  montant_ttc:  result.montant_ttc  ?? result.montant ?? 0,
-  devise:       result.devise,
-  categorie:    result.categorie,
-  description:  result.description,
-  items:        result.items,
-  taxes:        result.taxes,
-  numero_recu:  result.numero_recu,
-  numero_projet: result.numero_projet ?? '',
-  note:         note || '',
-  file_url:     fileUrl,
-  file_type:    item.fileType,
-  file_name:    item.file.name,
-  preview_url:  item.previewUrl,
-  statut:       'En attente',
-});
-
+          id:            receiptId,
+          user_id:       user.id,
+          employe_nom:   `${profile.prenom} ${profile.nom}`,
+          fournisseur:   result.fournisseur,
+          date:          result.date,
+          montant:       result.montant,
+          montant_ht:    result.montant_ht    ?? result.montant ?? 0,
+          tps:           result.tps           ?? 0,
+          tvq:           result.tvq           ?? 0,
+          montant_ttc:   result.montant_ttc   ?? result.montant ?? 0,
+          devise:        result.devise,
+          categorie:     result.categorie,
+          description:   result.description,
+          items:         result.items,
+          taxes:         result.taxes,
+          numero_recu:   result.numero_recu,
+          numero_projet: result.numero_projet ?? '',
+          note:          note || '',
+          file_url:      fileUrl,
+          file_type:     item.fileType,
+          file_name:     item.file.name,
+          preview_url:   item.previewUrl,
+          statut:        'En attente',
+        });
         setDoneCount(c => c+1);
         setPendingFiles(prev => prev.map(p => p.id===item.id ? {...p,status:'done'} : p));
       } catch {
@@ -171,7 +164,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
 
   return (
     <div>
-      {/* Camera overlay */}
       {cameraOpen && (
         <div style={{position:'fixed',inset:0,background:'#000',zIndex:9999,display:'flex',flexDirection:'column'}}>
           <video ref={videoRef} autoPlay playsInline muted style={{flex:1,objectFit:'cover',width:'100%'}} />
@@ -202,7 +194,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
       <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Soumettre des reçus</h1>
       <p style={{color:'#64748b',fontSize:14,marginBottom:24}}>Soumis en tant que <strong style={{color:'#a5b4fc'}}>{profile.prenom} {profile.nom}</strong></p>
 
-      {/* Action buttons */}
       <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
         <button onClick={()=>openCamera('environment')}
           style={{background:'linear-gradient(135deg,#0ea5e9,#38bdf8)',color:'#fff',border:'none',borderRadius:10,padding:'12px 20px',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:8}}>
@@ -214,14 +205,12 @@ export default function UploadPage({ user, profile, onNavigate }) {
         </button>
       </div>
 
-      {/* Formats info */}
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:24}}>
         {[{l:'Images',c:'#6366f1'},{l:'PDF',c:'#ef4444'},{l:'Word',c:'#0ea5e9'},{l:'Excel',c:'#10b981'},{l:'CSV',c:'#f59e0b'}].map(f=>(
           <span key={f.l} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600,background:`${f.c}15`,color:f.c,border:`1px solid ${f.c}40`}}>{f.l}</span>
         ))}
       </div>
 
-      {/* Drop zone */}
       <div onClick={()=>fileRef.current.click()}
         onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='#6366f1'}}
         onDragLeave={e=>{e.currentTarget.style.borderColor=''}}
@@ -238,7 +227,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
         )}
       </div>
 
-      {/* File thumbnails */}
       {pendingFiles.length>0 && (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:12,marginBottom:24}}>
           {pendingFiles.map(item=>(
@@ -261,7 +249,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
         </div>
       )}
 
-      {/* Form */}
       {pendingFiles.length>0 && (
         <div style={{background:'#1a1f2e',borderRadius:16,border:'1px solid rgba(255,255,255,.06)',padding:24}}>
           <div style={{marginBottom:16}}>
