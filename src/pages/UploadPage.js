@@ -68,10 +68,24 @@ export default function UploadPage({ user, profile, onNavigate }) {
         { type:'text', text:SYSTEM_PROMPT_IMAGE },
       ];
     } else if (item.fileType === 'pdf') {
+  try {
+    const text = await wordToText(item.file);
+    if (text && text.trim().length > 50) {
+      messageContent = [{ type:'text', text:`${SYSTEM_PROMPT_TEXT}\n\n--- DOCUMENT ---\n${text.slice(0,8000)}` }];
+    } else {
       const b64 = await pdfToBase64Image(item.file);
       messageContent = [
         { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
         { type:'text', text:SYSTEM_PROMPT_IMAGE },
+      ];
+    }
+  } catch {
+    const b64 = await pdfToBase64Image(item.file);
+    messageContent = [
+      { type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64} },
+      { type:'text', text:SYSTEM_PROMPT_IMAGE },
+    ];
+  }
       ];
     } else if (item.fileType === 'word') {
       const text = await wordToText(item.file);
