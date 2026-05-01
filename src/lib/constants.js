@@ -68,7 +68,7 @@ Analyse ce document (reçu, facture ou note de frais) et extrais les information
   "numero_projet": "numéro de projet si visible sur le reçu, sinon null",
   "description": "brève description de l'achat en 1-2 phrases",
   "items": [{"nom": "...", "montant": number}],
-  "numero_recu": "numéro de reçu/facture si visible, sinon null"
+  "numero_recu": "numéro de reçu/facture si visible, sinon null", "pourboire": number ou null (pourboire/tip si visible sur le reçu, sinon null)
 }
 Réponds UNIQUEMENT avec le JSON, sans markdown, sans explication.`;
 
@@ -86,6 +86,6 @@ Voici le contenu textuel extrait d'un document. Extrais les informations en JSON
   "numero_projet": "numéro de projet si visible, sinon null",
   "description": "brève description de l'achat en 1-2 phrases",
   "items": [{"nom": "...", "montant": number}],
-  "numero_recu": "numéro de reçu/facture si visible, sinon null"
+  "numero_recu": "numéro de reçu/facture si visible, sinon null", "pourboire": number ou null (pourboire/tip si visible sur le reçu, sinon null)
 }
 Réponds UNIQUEMENT avec le JSON, sans markdown, sans explication.`;
