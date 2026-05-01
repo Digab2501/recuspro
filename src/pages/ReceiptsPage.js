@@ -4,11 +4,13 @@ import { CATEGORIES, STATUTS, TPS_RATE, TVQ_RATE } from '../lib/constants';
 import { getFileIcon } from '../lib/fileUtils';
 
 const calcTaxes = (r) => {
-  const ht  = r.montant_ht  ?? (r.montant_ttc ? r.montant_ttc / (1 + TPS_RATE + TVQ_RATE) : r.montant ?? 0);
-  const tps = r.tps         ?? (ht * TPS_RATE);
-  const tvq = r.tvq         ?? (ht * TVQ_RATE);
-  const ttc = r.montant_ttc ?? (r.montant ?? ht + tps + tvq);
-  return { ht, tps, tvq, ttc };
+  const ht       = r.montant_ht  ?? (r.montant_ttc ? r.montant_ttc / (1 + TPS_RATE + TVQ_RATE) : r.montant ?? 0);
+  const tps      = r.tps         ?? (ht * TPS_RATE);
+  const tvq      = r.tvq         ?? (ht * TVQ_RATE);
+  const ttc      = r.montant_ttc ?? (r.montant ?? ht + tps + tvq);
+  const pourboire = r.pourboire  ?? 0;
+  const total    = ttc + pourboire;
+  return { ht, tps, tvq, ttc, pourboire, total };
 };
 
 const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {    minimumFractionDigits: 2,    maximumFractionDigits: 2  });;
@@ -116,10 +118,10 @@ const [filterDateA,  setFilterDateA]  = useState('');
 });
 
   const totaux = filtered.reduce((acc,r) => {
-    const { ht, tps, tvq, ttc } = calcTaxes(r);
-    acc.ht += ht; acc.tps += tps; acc.tvq += tvq; acc.ttc += ttc;
-    return acc;
-  }, { ht:0, tps:0, tvq:0, ttc:0 });
+  const { ht, tps, tvq, total } = calcTaxes(r);
+  acc.ht += ht; acc.tps += tps; acc.tvq += tvq; acc.ttc += total;
+  return acc;
+}, { ht:0, tps:0, tvq:0, ttc:0 });
 
   const statStyle = (s) => ({
     'En attente': { bg:'rgba(245,158,11,.15)',  color:'#f59e0b' },
@@ -266,10 +268,20 @@ const [filterDateA,  setFilterDateA]  = useState('');
                 <span style={{ color:c, fontFamily:"'DM Mono',monospace" }}>{v} $</span>
               </div>
             ))}
-            <div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0 0', fontSize:16, fontWeight:700 }}>
-              <span style={{ color:'#94a3b8' }}>Avec taxes</span>
-              <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} {selected.devise || 'CAD'}</span>
-            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
+  <span style={{ color:'#64748b' }}>Avec taxes</span>
+  <span style={{ color:'#e2e8f0', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} $</span>
+</div>
+{pourboire > 0 && (
+  <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
+    <span style={{ color:'#64748b' }}>Pourboire</span>
+    <span style={{ color:'#f59e0b', fontFamily:"'DM Mono',monospace" }}>{fmt(pourboire)} $</span>
+  </div>
+)}
+<div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0 0', fontSize:16, fontWeight:700 }}>
+  <span style={{ color:'#94a3b8' }}>Total</span>
+  <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(total)} {selected.devise || 'CAD'}</span>
+</div>
             <div style={{ marginTop:14 }}>
               <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:700, ...statStyle(selected.statut) }}>
                 {selected.statut}
