@@ -141,6 +141,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
           taxes:         result.taxes,
           numero_recu:   result.numero_recu,
           numero_projet: result.numero_projet ?? '',
+          pourboire: result.pourboire ?? 0,
           note:          note || '',
           file_url:      fileUrl,
           file_type:     item.fileType,
