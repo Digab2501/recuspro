@@ -139,7 +139,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
   // VUE DÉTAIL
   // ══════════════════════════════════════════════
   if (selected) {
-    const { ht, tps, tvq, ttc } = calcTaxes(selected);
+    const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(selected);
     const cat = CATEGORIES[selected.categorie] || { icon:'📋', color:'#94a3b8' };
     return (
       <div style={{ maxWidth:720 }}>
