@@ -98,7 +98,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
     const rows = [
       ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Avec Taxe','N° Projet','Devise','Employé','Approbateur','Statut'],
       ...filtered.map(r => {
-        const { ht, tps, tvq, ttc } = calcTaxes(r);
+        const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
         return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.employe_nom, r.approbateur_nom||'', r.statut];
       }),
     ];
@@ -427,7 +427,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
               <thead>
                 <tr style={{ borderBottom:'1px solid rgba(255,255,255,.06)' }}>
-                  {['', 'Date', 'Fournisseur', 'Catégorie', 'Descriptif', 'Hors taxe', 'TPS', 'TVQ', 'Avec taxes', 'N° Projet',
+                  {['', 'Date', 'Fournisseur', 'Catégorie', 'Descriptif', 'Hors taxe', 'TPS', 'TVQ', 'Avec taxes', 'Pourboire', 'Total', 'N° Projet',
                     ...(isApprobateur ? ['Employé', 'Approbateur'] : []),
                     'Statut', ''].map((h, i) => (
                     <th key={i} style={{ padding:'12px', textAlign:'left', fontSize:10, fontWeight:600, color:'#475569', textTransform:'uppercase', letterSpacing:.5, whiteSpace:'nowrap' }}>{h}</th>
@@ -436,7 +436,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
               </thead>
               <tbody>
                 {filtered.map(r => {
-                  const { ht, tps, tvq, ttc } = calcTaxes(r);
+                  const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
                   const cat = CATEGORIES[r.categorie] || { icon:'📋', color:'#94a3b8' };
                   return (
                     <tr key={r.id} onClick={() => setSelected(r)}
@@ -459,7 +459,9 @@ const [filterDateA,  setFilterDateA]  = useState('');
                       <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ht)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tps)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tvq)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:14, fontWeight:700, color:'#a5b4fc', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ttc)} $</td>
+                      <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ttc)} $</td>
+                      <td style={{ padding:'10px 12px', fontSize:12, color: pourboire > 0 ? '#f59e0b' : '#334155', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{pourboire > 0 ? fmt(pourboire)+' $' : '—'}</td>
+                      <td style={{ padding:'10px 12px', fontSize:14, fontWeight:700, color:'#a5b4fc', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(total)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:r.numero_projet ? '#a5b4fc' : '#334155', whiteSpace:'nowrap' }}>{r.numero_projet || '—'}</td>
                       {isApprobateur && (
                         <>
