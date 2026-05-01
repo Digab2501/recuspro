@@ -257,8 +257,9 @@ const [filterDateA,  setFilterDateA]  = useState('');
             <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Détail des montants</div>
             {[
               ['Hors taxe',    fmt(ht),  '#e2e8f0'],
-              ['TPS (5%)',     fmt(tps), '#94a3b8'],
-              ['TVQ (9.975%)', fmt(tvq), '#94a3b8'],
+['TPS (5%)',     fmt(tps), '#94a3b8'],
+['TVQ (9.975%)', fmt(tvq), '#94a3b8'],
+...(selected.pourboire > 0 ? [['Pourboire', fmt(selected.pourboire), '#f59e0b']] : []),
             ].map(([k, v, c]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
                 <span style={{ color:'#64748b' }}>{k}</span>
