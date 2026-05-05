@@ -60,11 +60,13 @@ const [filterDateA,  setFilterDateA]  = useState('');
     const ht  = parseFloat(editForm.montant_ht) || 0;
     const tps = parseFloat(editForm.tps)         || 0;
     const tvq = parseFloat(editForm.tvq)         || 0;
-    const ttc = ht + tps + tvq;
+    const pourboire = parseFloat(editForm.pourboire)         || 0;
+    const ttc = ht + tps + pourboire + tvq;
     const updates = {
       montant_ht:    ht,
       tps:           tps,
       tvq:           tvq,
+      pourboire:           pourboire,
       montant_ttc:   ttc,
       montant:       ttc,
       numero_projet: editForm.numero_projet || '',
@@ -96,10 +98,10 @@ const [filterDateA,  setFilterDateA]  = useState('');
 
   const downloadCSV = () => {
     const rows = [
-      ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Avec Taxe','N° Projet','Devise','Employé','Approbateur','Statut'],
+      ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Pourboire','Avec Taxe','N° Projet','Devise','Employé','Approbateur','Statut'],
       ...filtered.map(r => {
         const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
-        return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.employe_nom, r.approbateur_nom||'', r.statut];
+        return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(pourboire), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.employe_nom, r.approbateur_nom||'', r.statut];
       }),
     ];
     const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -119,9 +121,9 @@ const [filterDateA,  setFilterDateA]  = useState('');
 
   const totaux = filtered.reduce((acc,r) => {
   const { ht, tps, tvq, total } = calcTaxes(r);
-  acc.ht += ht; acc.tps += tps; acc.tvq += tvq; acc.ttc += total;
+  acc.ht += ht; acc.tps += tps; acc.tvq += tvq; acc.pourboire += pourboire; acc.ttc += total;
   return acc;
-}, { ht:0, tps:0, tvq:0, ttc:0 });
+}, { ht:0, tps:0, tvq:0, pourboire:0, ttc:0 });
 
   const statStyle = (s) => ({
     'En attente': { bg:'rgba(245,158,11,.15)',  color:'#f59e0b' },
@@ -261,6 +263,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
               ['Hors taxe',    fmt(ht),  '#e2e8f0'],
               ['TPS (5%)',     fmt(tps), '#94a3b8'],
               ['TVQ (9.975%)', fmt(tvq), '#94a3b8'],
+              ['Pourboire', fmt(pourboire), '#94a3b8'],
             ].map(([k, v, c]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
                 <span style={{ color:'#64748b' }}>{k}</span>
@@ -402,6 +405,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
             { label:'Hors taxe',    value:fmt(totaux.ht),  color:'#e2e8f0' },
             { label:'TPS (5%)',     value:fmt(totaux.tps), color:'#94a3b8' },
             { label:'TVQ (9.975%)', value:fmt(totaux.tvq), color:'#94a3b8' },
+            { label:'Pourboire', value:fmt(totaux.pourboire), color:'#94a3b8' },
             { label:'Avec taxes',   value:fmt(totaux.ttc), color:'#a5b4fc' },
           ].map(c => (
             <div key={c.label} style={{ background:'#1a1f2e', borderRadius:10, border:'1px solid rgba(255,255,255,.06)', padding:'12px 16px' }}>
@@ -459,6 +463,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
                       <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ht)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tps)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tvq)} $</td>
+                      <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(pourboire)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ttc)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color: pourboire > 0 ? '#f59e0b' : '#334155', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{pourboire > 0 ? fmt(pourboire)+' $' : '—'}</td>
                       <td style={{ padding:'10px 12px', fontSize:14, fontWeight:700, color:'#a5b4fc', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(total)} $</td>
