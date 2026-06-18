@@ -94,7 +94,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
     const resp = await fetch('/api/analyze', {
       method:'POST',
       headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{role:'user', content:messageContent}] }),
+      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1000, messages:[{role:'user', content:messageContent}] }),
     });
     if (!resp.ok) throw new Error(`API error ${resp.status}`);
     const data = await resp.json();
