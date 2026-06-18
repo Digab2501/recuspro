@@ -13,7 +13,7 @@ const calcTaxes = (r) => {
   return { ht, tps, tvq, ttc, pourboire, total };
 };
 
-const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', {    minimumFractionDigits: 2,    maximumFractionDigits: 2  });;
+const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ReceiptsPage({ user, profile }) {
   const [receipts,    setReceipts]    = useState([]);
@@ -24,7 +24,7 @@ export default function ReceiptsPage({ user, profile }) {
   const [filterCat,   setFilterCat]   = useState('Toutes');
   const [filterStat,  setFilterStat]  = useState('Tous');
   const [filterDateDe, setFilterDateDe] = useState('');
-const [filterDateA,  setFilterDateA]  = useState('');
+  const [filterDateA,  setFilterDateA]  = useState('');
 
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
@@ -35,21 +35,20 @@ const [filterDateA,  setFilterDateA]  = useState('');
     let query = supabase.from('receipts').select('*').order('date', { ascending: false });
     if (!isApprobateur) query = query.eq('user_id', user.id);
     const { data } = await query;
-    
-    // Générer des liens signés pour chaque fichier
+
     const receiptsWithUrls = await Promise.all((data || []).map(async (r) => {
       if (r.file_url && r.file_url.includes('/storage/v1/object/')) {
         const path = r.file_url.split('/receipts/')[1];
         if (path) {
           const { data: signed } = await supabase.storage
             .from('receipts')
-            .createSignedUrl(path, 3600); // lien valide 1 heure
+            .createSignedUrl(path, 3600);
           return { ...r, file_url: signed?.signedUrl || r.file_url };
         }
       }
       return r;
     }));
-    
+
     setReceipts(receiptsWithUrls);
     setLoading(false);
   };
@@ -60,13 +59,13 @@ const [filterDateA,  setFilterDateA]  = useState('');
     const ht  = parseFloat(editForm.montant_ht) || 0;
     const tps = parseFloat(editForm.tps)         || 0;
     const tvq = parseFloat(editForm.tvq)         || 0;
-    const pourboire = parseFloat(editForm.pourboire)         || 0;
+    const pourboire = parseFloat(editForm.pourboire) || 0;
     const ttc = ht + tps + pourboire + tvq;
     const updates = {
       montant_ht:    ht,
       tps:           tps,
       tvq:           tvq,
-      pourboire:           pourboire,
+      pourboire:     pourboire,
       montant_ttc:   ttc,
       montant:       ttc,
       numero_projet: editForm.numero_projet || '',
@@ -100,7 +99,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
     const rows = [
       ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Pourboire','Avec Taxe','N° Projet','Devise','Employé','Approbateur','Statut'],
       ...filtered.map(r => {
-        const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
+        const { ht, tps, tvq, ttc, pourboire } = calcTaxes(r);
         return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(pourboire), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.employe_nom, r.approbateur_nom||'', r.statut];
       }),
     ];
@@ -112,22 +111,22 @@ const [filterDateA,  setFilterDateA]  = useState('');
   };
 
   const filtered = receipts.filter(r => {
-  if (filterCat    !== 'Toutes' && r.categorie !== filterCat)  return false;
-  if (filterStat   !== 'Tous'   && r.statut    !== filterStat) return false;
-  if (filterDateDe && r.date    <  filterDateDe)               return false;
-  if (filterDateA  && r.date    >  filterDateA)                return false;
-  return true;
-});
+    if (filterCat    !== 'Toutes' && r.categorie !== filterCat)  return false;
+    if (filterStat   !== 'Tous'   && r.statut    !== filterStat) return false;
+    if (filterDateDe && r.date    <  filterDateDe)               return false;
+    if (filterDateA  && r.date    >  filterDateA)                return false;
+    return true;
+  });
 
-  const totaux = filtered.reduce((acc,r) => {
- const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
-  acc.ht += ht;
-  acc.tps += tps;
-  acc.tvq += tvq;
-  acc.pourboire += pourboire;
-  acc.ttc += total;
-  return acc;
-}, { ht:0, tps:0, tvq:0, pourboire:0, ttc:0 });
+  const totaux = filtered.reduce((acc, r) => {
+    const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
+    acc.ht += ht;
+    acc.tps += tps;
+    acc.tvq += tvq;
+    acc.pourboire += pourboire;
+    acc.ttc += total;
+    return acc;
+  }, { ht:0, tps:0, tvq:0, pourboire:0, ttc:0 });
 
   const statStyle = (s) => ({
     'En attente': { bg:'rgba(245,158,11,.15)',  color:'#f59e0b' },
@@ -267,7 +266,7 @@ const [filterDateA,  setFilterDateA]  = useState('');
               ['Hors taxe',    fmt(ht),  '#e2e8f0'],
               ['TPS (5%)',     fmt(tps), '#94a3b8'],
               ['TVQ (9.975%)', fmt(tvq), '#94a3b8'],
-              ['Pourboire', fmt(pourboire), '#94a3b8'],
+              ['Pourboire',    fmt(pourboire), '#94a3b8'],
             ].map(([k, v, c]) => (
               <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
                 <span style={{ color:'#64748b' }}>{k}</span>
@@ -275,19 +274,19 @@ const [filterDateA,  setFilterDateA]  = useState('');
               </div>
             ))}
             <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-  <span style={{ color:'#64748b' }}>Avec taxes</span>
-  <span style={{ color:'#e2e8f0', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} $</span>
-</div>
-{pourboire > 0 && (
-  <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-    <span style={{ color:'#64748b' }}>Pourboire</span>
-    <span style={{ color:'#f59e0b', fontFamily:"'DM Mono',monospace" }}>{fmt(pourboire)} $</span>
-  </div>
-)}
-<div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0 0', fontSize:16, fontWeight:700 }}>
-  <span style={{ color:'#94a3b8' }}>Total</span>
-  <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(total)} {selected.devise || 'CAD'}</span>
-</div>
+              <span style={{ color:'#64748b' }}>Avec taxes</span>
+              <span style={{ color:'#e2e8f0', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} $</span>
+            </div>
+            {pourboire > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
+                <span style={{ color:'#64748b' }}>Pourboire</span>
+                <span style={{ color:'#f59e0b', fontFamily:"'DM Mono',monospace" }}>{fmt(pourboire)} $</span>
+              </div>
+            )}
+            <div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0 0', fontSize:16, fontWeight:700 }}>
+              <span style={{ color:'#94a3b8' }}>Total</span>
+              <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(total)} {selected.devise || 'CAD'}</span>
+            </div>
             <div style={{ marginTop:14 }}>
               <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:700, ...statStyle(selected.statut) }}>
                 {selected.statut}
@@ -406,11 +405,11 @@ const [filterDateA,  setFilterDateA]  = useState('');
       {filtered.length > 0 && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
           {[
-            { label:'Hors taxe',    value:fmt(totaux.ht),  color:'#e2e8f0' },
-            { label:'TPS (5%)',     value:fmt(totaux.tps), color:'#94a3b8' },
-            { label:'TVQ (9.975%)', value:fmt(totaux.tvq), color:'#94a3b8' },
-            { label:'Pourboire', value:fmt(totaux.pourboire), color:'#94a3b8' },
-            { label:'Avec taxes',   value:fmt(totaux.ttc), color:'#a5b4fc' },
+            { label:'Hors taxe',    value:fmt(totaux.ht),       color:'#e2e8f0' },
+            { label:'TPS (5%)',     value:fmt(totaux.tps),      color:'#94a3b8' },
+            { label:'TVQ (9.975%)', value:fmt(totaux.tvq),      color:'#94a3b8' },
+            { label:'Pourboire',    value:fmt(totaux.pourboire),color:'#94a3b8' },
+            { label:'Avec taxes',   value:fmt(totaux.ttc),      color:'#a5b4fc' },
           ].map(c => (
             <div key={c.label} style={{ background:'#1a1f2e', borderRadius:10, border:'1px solid rgba(255,255,255,.06)', padding:'12px 16px' }}>
               <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>{c.label}</div>
