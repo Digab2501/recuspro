@@ -120,8 +120,8 @@ const [filterDateA,  setFilterDateA]  = useState('');
 });
 
   const totaux = filtered.reduce((acc,r) => {
-- const { ht, tps, tvq, total } = calcTaxes(r);
-+ const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
+ const { ht, tps, tvq, total } = calcTaxes(r);
+ const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
   acc.ht += ht;
   acc.tps += tps;
   acc.tvq += tvq;
