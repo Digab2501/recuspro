@@ -33,7 +33,7 @@ if (hash.includes('type=recovery')) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const loadProfile = async (uid) => {
+ const loadProfile = async (uid) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
     if (data) {
       setProfile(data);
@@ -49,10 +49,8 @@ if (hash.includes('type=recovery')) {
         actif:  true,
       };
       await supabase.from('profiles').upsert(newProfile, { onConflict: 'id', ignoreDuplicates: true });
-      // Relire le profil réel depuis la base (pour ne pas écraser le rôle)
       const { data: actual } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       setProfile(actual || newProfile);
-    }
     }
     setLoading(false);
   };
