@@ -34,7 +34,7 @@ if (hash.includes('type=recovery')) {
   }, []);
 
   const loadProfile = async (uid) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
     if (data) {
       setProfile(data);
     } else {
@@ -45,10 +45,10 @@ if (hash.includes('type=recovery')) {
         email:  user?.email,
         nom:    meta.nom    || '',
         prenom: meta.prenom || '',
-        role:   meta.role   || 'employee',
+        role:   'employee',
         actif:  true,
       };
-      await supabase.from('profiles').upsert(newProfile);
+      await supabase.from('profiles').insert(newProfile).onConflict('id').ignore();
       setProfile(newProfile);
     }
     setLoading(false);
