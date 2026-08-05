@@ -34,7 +34,8 @@ if (hash.includes('type=recovery')) {
   }, []);
 
  const loadProfile = async (uid) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    console.log('PROFILE LOAD:', { data, error, uid });
     if (data) {
       setProfile(data);
     } else {
