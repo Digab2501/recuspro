@@ -48,7 +48,7 @@ if (hash.includes('type=recovery')) {
         role:   'employee',
         actif:  true,
       };
-      await supabase.from('profiles').insert(newProfile).onConflict('id').ignore();
+      await supabase.from('profiles').upsert(newProfile, { onConflict: 'id', ignoreDuplicates: true });
       setProfile(newProfile);
     }
     setLoading(false);
