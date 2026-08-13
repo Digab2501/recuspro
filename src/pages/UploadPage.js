@@ -129,7 +129,6 @@ export default function UploadPage({ user, profile, onNavigate }) {
           employe_nom:   `${profile.prenom} ${profile.nom}`,
           fournisseur:   result.fournisseur,
           date:          result.date,
-          montant:       result.montant,
           montant_ht:    result.montant_ht    ?? result.montant ?? 0,
           tps:           result.tps           ?? 0,
           tvq:           result.tvq           ?? 0,
