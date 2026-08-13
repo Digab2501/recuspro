@@ -462,6 +462,7 @@ export default function ReceiptsPage({ user, profile }) {
                           {cat.icon} {r.categorie}
                         </span>
                       </td>
+                      <td style={{ padding:'10px 12px', fontSize:12, color:'#94a3b8', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.description || '—'}</td>
                       <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ht)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tps)} $</td>
                       <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tvq)} $</td>
