@@ -145,7 +145,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
           file_url:      fileUrl,
           file_type:     item.fileType,
           file_name:     item.file.name,
-          preview_url:   item.previewUrl,
+          preview_url: fileUrl,
           statut:        'En attente',
         });
         setDoneCount(c => c+1);
