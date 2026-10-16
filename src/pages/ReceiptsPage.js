@@ -15,6 +15,115 @@ const calcTaxes = (r) => {
 
 const fmt = (n) => Number(n || 0).toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const VIDE = '(Vide)';
+
+// Colonnes filtrables / triables du tableau
+// filterVal : texte affiché dans la liste du filtre — sortVal : valeur utilisée pour trier
+const COLUMNS = [
+  { key:'date',            label:'Date',        filterVal: r => r.date || VIDE,                   sortVal: r => r.date || '' },
+  { key:'fournisseur',     label:'Fournisseur', filterVal: r => r.fournisseur || VIDE,            sortVal: r => (r.fournisseur || '').toLowerCase() },
+  { key:'categorie',       label:'Catégorie',   filterVal: r => r.categorie || VIDE,              sortVal: r => (r.categorie || '').toLowerCase() },
+  { key:'description',     label:'Descriptif',  filterVal: r => r.description || VIDE,            sortVal: r => (r.description || '').toLowerCase() },
+  { key:'ht',              label:'Hors taxe',   filterVal: r => fmt(calcTaxes(r).ht) + ' $',      sortVal: r => calcTaxes(r).ht,        num:true },
+  { key:'tps',             label:'TPS',         filterVal: r => fmt(calcTaxes(r).tps) + ' $',     sortVal: r => calcTaxes(r).tps,       num:true },
+  { key:'tvq',             label:'TVQ',         filterVal: r => fmt(calcTaxes(r).tvq) + ' $',     sortVal: r => calcTaxes(r).tvq,       num:true },
+  { key:'ttc',             label:'Avec taxes',  filterVal: r => fmt(calcTaxes(r).ttc) + ' $',     sortVal: r => calcTaxes(r).ttc,       num:true },
+  { key:'pourboire',       label:'Pourboire',   filterVal: r => calcTaxes(r).pourboire > 0 ? fmt(calcTaxes(r).pourboire) + ' $' : VIDE, sortVal: r => calcTaxes(r).pourboire, num:true },
+  { key:'total',           label:'Total',       filterVal: r => fmt(calcTaxes(r).total) + ' $',   sortVal: r => calcTaxes(r).total,     num:true },
+  { key:'numero_projet',   label:'N° Projet',   filterVal: r => r.numero_projet || VIDE,          sortVal: r => (r.numero_projet || '').toLowerCase() },
+  { key:'employe_nom',     label:'Employé',     filterVal: r => r.employe_nom || VIDE,            sortVal: r => (r.employe_nom || '').toLowerCase(),     approbOnly:true },
+  { key:'approbateur_nom', label:'Approbateur', filterVal: r => r.approbateur_nom || VIDE,        sortVal: r => (r.approbateur_nom || '').toLowerCase(), approbOnly:true },
+  { key:'statut',          label:'Statut',      filterVal: r => r.statut || VIDE,                 sortVal: r => (r.statut || '').toLowerCase() },
+];
+
+// ── Menu de filtre style Excel ──
+function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onClose, anchor }) {
+  const allValues = Array.from(new Set(rows.map(col.filterVal)));
+  // Trie la liste des valeurs (numérique pour les montants)
+  const sample = Object.fromEntries(rows.map(r => [col.filterVal(r), col.sortVal(r)]));
+  allValues.sort((a, b) => {
+    if (a === VIDE) return 1;
+    if (b === VIDE) return -1;
+    const va = sample[a], vb = sample[b];
+    return col.num ? va - vb : String(va).localeCompare(String(vb), 'fr');
+  });
+
+  const [search, setSearch] = useState('');
+  const [draft, setDraft] = useState(() => new Set(selectedVals ?? allValues));
+  const visible = allValues.filter(v => v.toLowerCase().includes(search.toLowerCase()));
+  const allVisibleChecked = visible.length > 0 && visible.every(v => draft.has(v));
+
+  const toggle = (v) => setDraft(d => { const n = new Set(d); n.has(v) ? n.delete(v) : n.add(v); return n; });
+  const toggleAll = () => setDraft(d => {
+    const n = new Set(d);
+    visible.forEach(v => allVisibleChecked ? n.delete(v) : n.add(v));
+    return n;
+  });
+
+  const apply = () => {
+    // Si une recherche est tapée, on ne garde que les valeurs visibles cochées (comme Excel)
+    const kept = search ? visible.filter(v => draft.has(v)) : allValues.filter(v => draft.has(v));
+    onApply(kept.length === allValues.length ? null : kept);
+  };
+
+  const menuBtn = (active) => ({
+    width:'100%', textAlign:'left', background: active ? 'rgba(99,102,241,.15)' : 'transparent', border:'none',
+    color: active ? '#a5b4fc' : '#cbd5e1', padding:'7px 10px', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'inherit',
+  });
+
+  const left = Math.min(anchor.left, window.innerWidth - 270);
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:999 }} />
+      <div onClick={e => e.stopPropagation()}
+        style={{ position:'fixed', top:anchor.bottom + 4, left: Math.max(8, left), width:260, zIndex:1000,
+          background:'#1e2433', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, boxShadow:'0 12px 32px rgba(0,0,0,.5)',
+          padding:8, textTransform:'none', letterSpacing:0, fontWeight:400 }}>
+        <button style={menuBtn(sort.key === col.key && sort.dir === 'asc')}  onClick={() => onSort(col.key, 'asc')}>
+          ↑ Trier {col.num ? 'du plus petit au plus grand' : 'de A à Z'}
+        </button>
+        <button style={menuBtn(sort.key === col.key && sort.dir === 'desc')} onClick={() => onSort(col.key, 'desc')}>
+          ↓ Trier {col.num ? 'du plus grand au plus petit' : 'de Z à A'}
+        </button>
+        <div style={{ height:1, background:'rgba(255,255,255,.07)', margin:'6px 0' }} />
+        <input autoFocus placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)',
+            borderRadius:6, color:'#e2e8f0', padding:'6px 10px', fontSize:12, fontFamily:'inherit', outline:'none', marginBottom:6 }} />
+        <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid rgba(255,255,255,.05)', borderRadius:6, padding:'4px 0' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:12, color:'#e2e8f0', cursor:'pointer', fontWeight:600 }}>
+            <input type="checkbox" checked={allVisibleChecked} onChange={toggleAll} />
+            (Tout sélectionner)
+          </label>
+          {visible.map(v => (
+            <label key={v} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:12, color:'#cbd5e1', cursor:'pointer' }}>
+              <input type="checkbox" checked={draft.has(v)} onChange={() => toggle(v)} />
+              <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v}</span>
+            </label>
+          ))}
+          {visible.length === 0 && <div style={{ padding:'8px 10px', fontSize:12, color:'#64748b' }}>Aucun résultat</div>}
+        </div>
+        <div style={{ display:'flex', gap:6, marginTop:8, justifyContent:'space-between' }}>
+          <button onClick={() => onApply(null)}
+            style={{ background:'transparent', border:'none', color:'#f87171', fontSize:12, cursor:'pointer', fontFamily:'inherit', padding:'6px 4px' }}>
+            Effacer
+          </button>
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={onClose}
+              style={{ background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', color:'#94a3b8', borderRadius:6, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              Annuler
+            </button>
+            <button onClick={apply} disabled={draft.size === 0}
+              style={{ background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', color:'#fff', borderRadius:6, padding:'6px 14px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: draft.size === 0 ? .5 : 1 }}>
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function ReceiptsPage({ user, profile }) {
   const [receipts,    setReceipts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -25,6 +134,9 @@ export default function ReceiptsPage({ user, profile }) {
   const [filterStat,  setFilterStat]  = useState('Tous');
   const [filterDateDe, setFilterDateDe] = useState('');
   const [filterDateA,  setFilterDateA]  = useState('');
+  const [colFilters,   setColFilters]   = useState({});              // { colKey: [valeurs gardées] }
+  const [sort,         setSort]         = useState({ key:'date', dir:'desc' });
+  const [openMenu,     setOpenMenu]     = useState(null);            // { key, anchor }
 
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
@@ -110,13 +222,40 @@ export default function ReceiptsPage({ user, profile }) {
     a.click();
   };
 
-  const filtered = receipts.filter(r => {
+  const visibleColumns = COLUMNS.filter(c => !c.approbOnly || isApprobateur);
+
+  // 1) Filtres du haut (période, catégorie, statut)
+  const baseFiltered = receipts.filter(r => {
     if (filterCat    !== 'Toutes' && r.categorie !== filterCat)  return false;
     if (filterStat   !== 'Tous'   && r.statut    !== filterStat) return false;
     if (filterDateDe && r.date    <  filterDateDe)               return false;
     if (filterDateA  && r.date    >  filterDateA)                return false;
     return true;
   });
+
+  // 2) Filtres de colonnes (on peut en exclure une, pour construire la liste de son propre menu)
+  const applyColFilters = (rows, exceptKey) => rows.filter(r =>
+    Object.entries(colFilters).every(([key, vals]) => {
+      if (key === exceptKey || !vals) return true;
+      const col = COLUMNS.find(c => c.key === key);
+      return !col || vals.includes(col.filterVal(r));
+    })
+  );
+
+  // 3) Tri
+  const sortCol = COLUMNS.find(c => c.key === sort.key);
+  const filtered = applyColFilters(baseFiltered).sort((a, b) => {
+    if (!sortCol) return 0;
+    const va = sortCol.sortVal(a), vb = sortCol.sortVal(b);
+    const cmp = sortCol.num ? va - vb : String(va).localeCompare(String(vb), 'fr');
+    return sort.dir === 'asc' ? cmp : -cmp;
+  });
+
+  const activeColFilters = Object.values(colFilters).filter(Boolean).length;
+
+  const clickHeader = (key) => setSort(s =>
+    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir:'asc' }
+  );
 
   const totaux = filtered.reduce((acc, r) => {
     const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
@@ -399,6 +538,12 @@ export default function ReceiptsPage({ user, profile }) {
             {s}
           </button>
         ))}
+        {activeColFilters > 0 && (
+          <button onClick={() => setColFilters({})}
+            style={{ marginLeft:'auto', padding:'5px 11px', fontSize:11, borderRadius:20, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.1)', color:'#f87171', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
+            ✕ Effacer les filtres de colonnes ({activeColFilters})
+          </button>
+        )}
       </div>
 
       {/* Sommaire taxes */}
@@ -422,7 +567,7 @@ export default function ReceiptsPage({ user, profile }) {
       {/* Tableau */}
       {loading ? (
         <div style={{ textAlign:'center', padding:48, color:'#475569' }}>Chargement…</div>
-      ) : filtered.length === 0 ? (
+      ) : baseFiltered.length === 0 ? (
         <div style={{ background:'#1a1f2e', borderRadius:16, border:'1px solid rgba(255,255,255,.06)', padding:48, textAlign:'center' }}>
           <div style={{ fontSize:40, marginBottom:12 }}>📂</div>
           <div style={{ fontWeight:600, marginBottom:6 }}>Aucun reçu</div>
@@ -434,14 +579,45 @@ export default function ReceiptsPage({ user, profile }) {
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
               <thead>
                 <tr style={{ borderBottom:'1px solid rgba(255,255,255,.06)' }}>
-                  {['', 'Date', 'Fournisseur', 'Catégorie', 'Descriptif', 'Hors taxe', 'TPS', 'TVQ', 'Avec taxes', 'Pourboire', 'Total', 'N° Projet',
-                    ...(isApprobateur ? ['Employé', 'Approbateur'] : []),
-                    'Statut', ''].map((h, i) => (
-                    <th key={i} style={{ padding:'12px', textAlign:'left', fontSize:10, fontWeight:600, color:'#475569', textTransform:'uppercase', letterSpacing:.5, whiteSpace:'nowrap' }}>{h}</th>
-                  ))}
+                  <th style={{ padding:'12px' }} />
+                  {visibleColumns.map(col => {
+                    const isSorted   = sort.key === col.key;
+                    const isFiltered = !!colFilters[col.key];
+                    return (
+                      <th key={col.key} style={{ padding:'8px 6px 8px 12px', textAlign:'left', fontSize:10, fontWeight:600, color: isSorted || isFiltered ? '#a5b4fc' : '#475569', textTransform:'uppercase', letterSpacing:.5, whiteSpace:'nowrap' }}>
+                        <div style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                          <span onClick={() => clickHeader(col.key)} title="Cliquer pour trier"
+                            style={{ cursor:'pointer', userSelect:'none' }}>
+                            {col.label}{isSorted ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                          </span>
+                          <button title="Filtrer"
+                            onClick={e => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setOpenMenu(m => m?.key === col.key ? null : { key: col.key, anchor: rect });
+                            }}
+                            style={{ background: isFiltered ? 'rgba(99,102,241,.25)' : 'rgba(255,255,255,.04)', border:'1px solid', borderColor: isFiltered ? 'rgba(99,102,241,.5)' : 'rgba(255,255,255,.08)',
+                              color: isFiltered ? '#a5b4fc' : '#64748b', borderRadius:4, width:18, height:18, padding:0, fontSize:9, cursor:'pointer', lineHeight:1, display:'grid', placeItems:'center' }}>
+                            {isFiltered ? '⧩' : '▾'}
+                          </button>
+                        </div>
+                      </th>
+                    );
+                  })}
+                  <th style={{ padding:'12px' }} />
                 </tr>
               </thead>
               <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={visibleColumns.length + 2} style={{ padding:32, textAlign:'center', fontSize:13, color:'#64748b' }}>
+                      Aucun reçu ne correspond aux filtres de colonnes.{' '}
+                      <button onClick={() => setColFilters({})}
+                        style={{ background:'none', border:'none', color:'#a5b4fc', cursor:'pointer', fontFamily:'inherit', fontSize:13, textDecoration:'underline' }}>
+                        Effacer les filtres
+                      </button>
+                    </td>
+                  </tr>
+                )}
                 {filtered.map(r => {
                   const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
                   const cat = CATEGORIES[r.categorie] || { icon:'📋', color:'#94a3b8' };
@@ -490,6 +666,24 @@ export default function ReceiptsPage({ user, profile }) {
           </div>
         </div>
       )}
+
+      {/* Menu de filtre ouvert */}
+      {openMenu && (() => {
+        const col = COLUMNS.find(c => c.key === openMenu.key);
+        return (
+          <ColumnFilterMenu
+            key={col.key}
+            col={col}
+            rows={applyColFilters(baseFiltered, col.key)}
+            selectedVals={colFilters[col.key]}
+            sort={sort}
+            anchor={openMenu.anchor}
+            onSort={(key, dir) => { setSort({ key, dir }); setOpenMenu(null); }}
+            onApply={(vals) => { setColFilters(f => ({ ...f, [col.key]: vals })); setOpenMenu(null); }}
+            onClose={() => setOpenMenu(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
