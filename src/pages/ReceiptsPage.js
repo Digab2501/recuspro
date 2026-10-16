@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import JSZip from 'jszip';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, STATUTS, TPS_RATE, TVQ_RATE } from '../lib/constants';
 import { getFileIcon } from '../lib/fileUtils';
@@ -137,6 +138,8 @@ export default function ReceiptsPage({ user, profile }) {
   const [colFilters,   setColFilters]   = useState({});              // { colKey: [valeurs gardées] }
   const [sort,         setSort]         = useState({ key:'date', dir:'desc' });
   const [openMenu,     setOpenMenu]     = useState(null);            // { key, anchor }
+  const [selectedIds,  setSelectedIds]  = useState(() => new Set());  // reçus cochés
+  const [bulkBusy,     setBulkBusy]     = useState('');               // message pendant une action groupée
 
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
@@ -252,6 +255,103 @@ export default function ReceiptsPage({ user, profile }) {
   });
 
   const activeColFilters = Object.values(colFilters).filter(Boolean).length;
+
+  // ── Sélection multiple ──
+  // On n'agit que sur les reçus cochés ET visibles avec les filtres actuels
+  const selectedRows   = filtered.filter(r => selectedIds.has(r.id));
+  const allChecked     = filtered.length > 0 && selectedRows.length === filtered.length;
+  const someChecked    = selectedRows.length > 0 && !allChecked;
+  const canDeleteRow   = (r) => isAdmin || r.user_id === user.id;
+
+  const toggleRow = (id) => setSelectedIds(s => {
+    const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
+  });
+  const toggleAllRows = () => setSelectedIds(allChecked ? new Set() : new Set(filtered.map(r => r.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const safeName = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
+
+  const guessExt = (r, blob) => {
+    const fromName = (r.file_name || '').split('.').pop();
+    if (fromName && fromName.length <= 5 && fromName !== r.file_name) return fromName.toLowerCase();
+    const type = blob?.type || r.file_type || '';
+    if (type.includes('pdf'))  return 'pdf';
+    if (type.includes('png'))  return 'png';
+    if (type.includes('webp')) return 'webp';
+    if (type.includes('heic')) return 'heic';
+    return 'jpg';
+  };
+
+  const downloadSelected = async () => {
+    const rows = selectedRows.filter(r => r.file_url);
+    if (rows.length === 0) { window.alert('Aucun document source pour les reçus sélectionnés.'); return; }
+
+    // Tous les documents sont regroupés dans un seul fichier .zip
+    const zip = new JSZip();
+    const used = new Set();
+    const failed = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      setBulkBusy(`Téléchargement ${i + 1} / ${rows.length}…`);
+      try {
+        const res = await fetch(r.file_url);
+        if (!res.ok) throw new Error(res.status);
+        const blob = await res.blob();
+        const base = [r.date || 'sans-date', safeName(r.fournisseur) || 'recu', fmt(calcTaxes(r).total).replace(/\s/g, '').replace(',', '.') + '$'].join('_');
+        let name = `${base}.${guessExt(r, blob)}`;
+        for (let n = 2; used.has(name); n++) name = `${base}_${n}.${guessExt(r, blob)}`;
+        used.add(name);
+        zip.file(name, blob);
+      } catch {
+        failed.push(r.fournisseur || r.id);
+      }
+    }
+
+    if (used.size > 0) {
+      setBulkBusy('Création du fichier .zip…');
+      const content = await zip.generateAsync({ type:'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = `recus_${new Date().toISOString().slice(0, 10)}_${used.size}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+    setBulkBusy('');
+
+    const noFile = selectedRows.length - rows.length;
+    const notes = [];
+    if (noFile > 0)        notes.push(`${noFile} reçu(s) sans document source ont été ignorés.`);
+    if (failed.length > 0) notes.push(`${failed.length} document(s) n'ont pas pu être téléchargés : ${failed.join(', ')}`);
+    if (notes.length) window.alert(notes.join('\n'));
+  };
+
+  const deleteSelected = async () => {
+    const deletable = selectedRows.filter(canDeleteRow);
+    const blocked   = selectedRows.length - deletable.length;
+    if (deletable.length === 0) { window.alert("Vous n'avez pas le droit de supprimer les reçus sélectionnés."); return; }
+
+    const total = deletable.reduce((s, r) => s + calcTaxes(r).total, 0);
+    const msg = `Supprimer définitivement ${deletable.length} reçu(s) pour un total de ${fmt(total)} $ ?`
+      + (blocked > 0 ? `\n\n(${blocked} reçu(s) seront ignorés : vous ne pouvez supprimer que les vôtres.)` : '')
+      + '\n\nCette action est irréversible.';
+    if (!window.confirm(msg)) return;
+
+    setBulkBusy(`Suppression de ${deletable.length} reçu(s)…`);
+    const ids = deletable.map(r => r.id);
+    const { data, error } = await supabase.from('receipts').delete().in('id', ids).select('id');
+    setBulkBusy('');
+
+    const deletedIds = new Set((data || []).map(d => d.id));
+    setReceipts(prev => prev.filter(r => !deletedIds.has(r.id)));
+    setSelectedIds(s => { const n = new Set(s); deletedIds.forEach(id => n.delete(id)); return n; });
+
+    if (error) {
+      window.alert(`Erreur lors de la suppression : ${error.message}`);
+    } else if (deletedIds.size < ids.length) {
+      window.alert(`${deletedIds.size} reçu(s) supprimé(s) sur ${ids.length}.\nLes autres ont été refusés par la base de données (droits de suppression).`);
+    }
+  };
 
   const clickHeader = (key) => setSort(s =>
     s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir:'asc' }
@@ -564,6 +664,43 @@ export default function ReceiptsPage({ user, profile }) {
         </div>
       )}
 
+      {/* Barre d'actions groupées */}
+      {selectedRows.length > 0 && (() => {
+        const selTotal = selectedRows.reduce((s, r) => s + calcTaxes(r).total, 0);
+        const nbDeletable = selectedRows.filter(canDeleteRow).length;
+        const actionBtn = (bg, border, color) => ({
+          background:bg, border:`1px solid ${border}`, color, borderRadius:8, padding:'8px 14px', fontSize:13, fontWeight:600,
+          cursor: bulkBusy ? 'wait' : 'pointer', fontFamily:'inherit', opacity: bulkBusy ? .6 : 1, whiteSpace:'nowrap',
+        });
+        return (
+          <div style={{ position:'sticky', top:0, zIndex:50, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
+            background:'#232a3d', border:'1px solid rgba(99,102,241,.35)', borderRadius:12, padding:'10px 16px', marginBottom:12,
+            boxShadow:'0 8px 24px rgba(0,0,0,.35)' }}>
+            <span style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>
+              {selectedRows.length} reçu(s) sélectionné(s)
+            </span>
+            <span style={{ fontSize:13, color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>· {fmt(selTotal)} $</span>
+            {bulkBusy && <span style={{ fontSize:12, color:'#94a3b8' }}>⏳ {bulkBusy}</span>}
+            <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button disabled={!!bulkBusy} onClick={downloadSelected}
+                style={actionBtn('rgba(99,102,241,.15)', 'rgba(99,102,241,.4)', '#c7d2fe')}>
+                ⬇ Télécharger les reçus (.zip)
+              </button>
+              {nbDeletable > 0 && (
+                <button disabled={!!bulkBusy} onClick={deleteSelected}
+                  style={actionBtn('rgba(239,68,68,.12)', 'rgba(239,68,68,.35)', '#f87171')}>
+                  🗑 Supprimer ({nbDeletable})
+                </button>
+              )}
+              <button disabled={!!bulkBusy} onClick={clearSelection}
+                style={actionBtn('rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', '#94a3b8')}>
+                ✕ Désélectionner
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Tableau */}
       {loading ? (
         <div style={{ textAlign:'center', padding:48, color:'#475569' }}>Chargement…</div>
@@ -579,6 +716,13 @@ export default function ReceiptsPage({ user, profile }) {
             <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
               <thead>
                 <tr style={{ borderBottom:'1px solid rgba(255,255,255,.06)' }}>
+                  <th style={{ padding:'8px 4px 8px 14px', width:20 }}>
+                    <input type="checkbox" title="Tout sélectionner"
+                      checked={allChecked}
+                      ref={el => { if (el) el.indeterminate = someChecked; }}
+                      onChange={toggleAllRows}
+                      style={{ cursor:'pointer', accentColor:'#6366f1', width:15, height:15 }} />
+                  </th>
                   <th style={{ padding:'12px' }} />
                   {visibleColumns.map(col => {
                     const isSorted   = sort.key === col.key;
@@ -609,7 +753,7 @@ export default function ReceiptsPage({ user, profile }) {
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={visibleColumns.length + 2} style={{ padding:32, textAlign:'center', fontSize:13, color:'#64748b' }}>
+                    <td colSpan={visibleColumns.length + 3}style={{ padding:32, textAlign:'center', fontSize:13, color:'#64748b' }}>
                       Aucun reçu ne correspond aux filtres de colonnes.{' '}
                       <button onClick={() => setColFilters({})}
                         style={{ background:'none', border:'none', color:'#a5b4fc', cursor:'pointer', fontFamily:'inherit', fontSize:13, textDecoration:'underline' }}>
@@ -621,11 +765,18 @@ export default function ReceiptsPage({ user, profile }) {
                 {filtered.map(r => {
                   const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
                   const cat = CATEGORIES[r.categorie] || { icon:'📋', color:'#94a3b8' };
+                  const isChecked = selectedIds.has(r.id);
+                  const rowBg = isChecked ? 'rgba(99,102,241,.08)' : '';
                   return (
                     <tr key={r.id} onClick={() => setSelected(r)}
-                      style={{ borderBottom:'1px solid rgba(255,255,255,.04)', cursor:'pointer', transition:'background .15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.03)'}
-                      onMouseLeave={e => e.currentTarget.style.background = ''}>
+                      style={{ borderBottom:'1px solid rgba(255,255,255,.04)', cursor:'pointer', transition:'background .15s', background: rowBg }}
+                      onMouseEnter={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,.03)'}
+                      onMouseLeave={e => e.currentTarget.style.background = rowBg}>
+                      <td onClick={e => { e.stopPropagation(); toggleRow(r.id); }}
+                        style={{ padding:'10px 4px 10px 14px', width:20, cursor:'pointer' }}>
+                        <input type="checkbox" checked={isChecked} readOnly
+                          style={{ cursor:'pointer', accentColor:'#6366f1', width:15, height:15, pointerEvents:'none' }} />
+                      </td>
                       <td style={{ padding:'10px 12px', width:44 }}>
                         {r.preview_url
                           ? <img src={r.preview_url} alt="" style={{ width:32, height:32, objectFit:'cover', borderRadius:6, display:'block' }} />
