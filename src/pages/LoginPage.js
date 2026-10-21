@@ -30,43 +30,43 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight:'100vh', background:'#0f1117', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
       <div style={{ width:'100%', maxWidth:400 }}>
         {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:40 }}>
           <div style={{ width:56, height:56, background:'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius:16, display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:28, marginBottom:16 }}>🧾</div>
           <h1 style={{ fontSize:26, fontWeight:700 }}>ReçusPro</h1>
-          <p style={{ color:'#475569', fontSize:14, marginTop:6 }}>Gestion centralisée des dépenses</p>
+          <p style={{ color:'var(--text-3)', fontSize:14, marginTop:6 }}>Gestion centralisée des dépenses</p>
         </div>
 
-        <div style={{ background:'#1a1f2e', borderRadius:20, border:'1px solid rgba(255,255,255,.07)', padding:32 }}>
+        <div style={{ background:'var(--surface)', borderRadius:20, border:'1px solid var(--border)', padding:32 }}>
           <h2 style={{ fontSize:18, fontWeight:700, marginBottom:24 }}>
             {mode === 'login' ? 'Connexion' : 'Mot de passe oublié'}
           </h2>
 
           <form onSubmit={mode === 'login' ? handleLogin : handleForgot}>
             <div style={{ marginBottom:16 }}>
-              <label style={{ fontSize:13, color:'#94a3b8', display:'block', marginBottom:6 }}>Adresse email</label>
+              <label style={{ fontSize:13, color:'var(--text-2)', display:'block', marginBottom:6 }}>Adresse email</label>
               <input
                 type="email" required value={email} onChange={e=>setEmail(e.target.value)}
                 placeholder="vous@entreprise.com"
-                style={{ width:'100%', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#e2e8f0', padding:'12px 16px', fontFamily:'inherit', fontSize:14, outline:'none' }}
+                style={{ width:'100%', background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:10, color:'var(--text)', padding:'12px 16px', fontFamily:'inherit', fontSize:14, outline:'none' }}
               />
             </div>
 
             {mode === 'login' && (
               <div style={{ marginBottom:20 }}>
-                <label style={{ fontSize:13, color:'#94a3b8', display:'block', marginBottom:6 }}>Mot de passe</label>
+                <label style={{ fontSize:13, color:'var(--text-2)', display:'block', marginBottom:6 }}>Mot de passe</label>
                 <input
                   type="password" required value={password} onChange={e=>setPassword(e.target.value)}
                   placeholder="••••••••"
-                  style={{ width:'100%', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, color:'#e2e8f0', padding:'12px 16px', fontFamily:'inherit', fontSize:14, outline:'none' }}
+                  style={{ width:'100%', background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:10, color:'var(--text)', padding:'12px 16px', fontFamily:'inherit', fontSize:14, outline:'none' }}
                 />
               </div>
             )}
 
             {error && (
-              <div style={{ padding:'10px 14px', borderRadius:8, marginBottom:16, background: error.startsWith('✅') ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)', color: error.startsWith('✅') ? '#10b981' : '#f87171', fontSize:13 }}>
+              <div style={{ padding:'10px 14px', borderRadius:8, marginBottom:16, background: error.startsWith('✅') ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)', color: error.startsWith('✅') ? 'var(--success-text)' : 'var(--danger-text)', fontSize:13 }}>
                 {error}
               </div>
             )}
@@ -80,13 +80,13 @@ export default function LoginPage() {
 
           <div style={{ textAlign:'center', marginTop:16 }}>
             {mode === 'login'
-              ? <button onClick={()=>setMode('forgot')} style={{ background:'none', border:'none', color:'#6366f1', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>Mot de passe oublié ?</button>
-              : <button onClick={()=>setMode('login')}  style={{ background:'none', border:'none', color:'#6366f1', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>← Retour à la connexion</button>
+              ? <button onClick={()=>setMode('forgot')} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>Mot de passe oublié ?</button>
+              : <button onClick={()=>setMode('login')}  style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>← Retour à la connexion</button>
             }
           </div>
         </div>
 
-        <p style={{ textAlign:'center', color:'#334155', fontSize:12, marginTop:20 }}>
+        <p style={{ textAlign:'center', color:'var(--text-4)', fontSize:13, marginTop:20 }}>
           Vous n'avez pas de compte ? Contactez votre administrateur.
         </p>
       </div>
