@@ -160,7 +160,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
     setTimeout(() => { setPendingFiles([]); setNote(''); onNavigate('list'); }, 1400);
   };
 
-  const sColor = (s) => ({done:'#10b981',error:'#ef4444',processing:'#6366f1',pending:'#475569'}[s]);
+  const sColor = (s) => ({done:'var(--success-text)',error:'var(--danger-text)',processing:'var(--accent)',pending:'var(--text-3)'}[s]);
   const sLabel = (s) => ({done:'✓ Envoyé',error:'✗ Erreur',processing:'⟳ Analyse…',pending:'En attente'}[s]);
 
   return (
@@ -183,7 +183,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
             <button onClick={()=>{closeCamera();}} style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',border:'none',borderRadius:10,padding:'10px 18px',fontSize:13,fontWeight:700,cursor:'pointer'}}>Terminer →</button>
           </div>
           <div style={{position:'absolute',bottom:148,left:'50%',transform:'translateX(-50%)'}}>
-            <button onClick={()=>{closeCamera();fileRef.current.click()}} style={{background:'rgba(255,255,255,.1)',border:'none',borderRadius:20,color:'#fff',padding:'8px 16px',fontSize:12,cursor:'pointer'}}>📁 Importer fichier</button>
+            <button onClick={()=>{closeCamera();fileRef.current.click()}} style={{background:'rgba(255,255,255,.1)',border:'none',borderRadius:20,color:'#fff',padding:'8px 16px',fontSize:13,cursor:'pointer'}}>📁 Importer fichier</button>
           </div>
         </div>
       )}
@@ -193,7 +193,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
       <input ref={cameraFileRef} type="file" accept="image/*"  capture="environment" style={{display:'none'}} onChange={e=>addFiles(e.target.files)} />
 
       <h1 style={{fontSize:22,fontWeight:700,marginBottom:4}}>Soumettre des reçus</h1>
-      <p style={{color:'#64748b',fontSize:14,marginBottom:24}}>Soumis en tant que <strong style={{color:'#a5b4fc'}}>{profile.prenom} {profile.nom}</strong></p>
+      <p style={{color:'var(--text-3)',fontSize:14,marginBottom:24}}>Soumis en tant que <strong style={{color:'var(--accent-text)'}}>{profile.prenom} {profile.nom}</strong></p>
 
       <div style={{display:'flex',gap:12,marginBottom:20,flexWrap:'wrap'}}>
         <button onClick={()=>openCamera('environment')}
@@ -201,29 +201,29 @@ export default function UploadPage({ user, profile, onNavigate }) {
           📷 Prendre une photo
         </button>
         <button onClick={()=>fileRef.current.click()}
-          style={{background:'rgba(255,255,255,.07)',border:'1px solid rgba(255,255,255,.1)',color:'#e2e8f0',borderRadius:10,padding:'12px 20px',fontSize:14,fontWeight:600,cursor:'pointer'}}>
+          style={{background:'var(--border)',border:'1px solid var(--border-strong)',color:'var(--text)',borderRadius:10,padding:'12px 20px',fontSize:14,fontWeight:600,cursor:'pointer'}}>
           📁 Importer fichiers
         </button>
       </div>
 
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:24}}>
         {[{l:'Images',c:'#6366f1'},{l:'PDF',c:'#ef4444'},{l:'Word',c:'#0ea5e9'},{l:'Excel',c:'#10b981'},{l:'CSV',c:'#f59e0b'}].map(f=>(
-          <span key={f.l} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:600,background:`${f.c}15`,color:f.c,border:`1px solid ${f.c}40`}}>{f.l}</span>
+          <span key={f.l} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'3px 10px',borderRadius:20,fontSize:12.5,fontWeight:600,background:`${f.c}15`,color:f.c,border:`1px solid ${f.c}40`}}>{f.l}</span>
         ))}
       </div>
 
       <div onClick={()=>fileRef.current.click()}
-        onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='#6366f1'}}
+        onDragOver={e=>{e.preventDefault();e.currentTarget.style.borderColor='var(--accent)'}}
         onDragLeave={e=>{e.currentTarget.style.borderColor=''}}
         onDrop={e=>{e.preventDefault();e.currentTarget.style.borderColor='';addFiles(e.dataTransfer.files)}}
         style={{border:'2px dashed rgba(99,102,241,.25)',borderRadius:14,padding:pendingFiles.length?'16px 20px':'40px 20px',textAlign:'center',cursor:'pointer',marginBottom:24,transition:'all .2s'}}>
         {pendingFiles.length ? (
-          <span style={{fontSize:14,color:'#64748b'}}>➕ Ajouter d'autres fichiers</span>
+          <span style={{fontSize:14,color:'var(--text-3)'}}>➕ Ajouter d'autres fichiers</span>
         ) : (
           <>
             <div style={{fontSize:40,marginBottom:12}}>📁</div>
             <div style={{fontWeight:600,marginBottom:4}}>Glissez vos fichiers ici</div>
-            <div style={{fontSize:13,color:'#475569'}}>ou cliquez pour sélectionner</div>
+            <div style={{fontSize:13,color:'var(--text-3)'}}>ou cliquez pour sélectionner</div>
           </>
         )}
       </div>
@@ -231,19 +231,19 @@ export default function UploadPage({ user, profile, onNavigate }) {
       {pendingFiles.length>0 && (
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))',gap:12,marginBottom:24}}>
           {pendingFiles.map(item=>(
-            <div key={item.id} style={{position:'relative',borderRadius:12,overflow:'hidden',aspectRatio:'4/3',background:'#0f1117',border:'1px solid rgba(255,255,255,.06)'}}>
+            <div key={item.id} style={{position:'relative',borderRadius:12,overflow:'hidden',aspectRatio:'4/3',background:'var(--bg)',border:'1px solid var(--border)'}}>
               {item.previewUrl
                 ? <img src={item.previewUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
                 : <div style={{width:'100%',height:'100%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6,padding:10}}>
                     <span style={{fontSize:30}}>{getFileIcon(item.fileType)}</span>
-                    <span style={{fontSize:10,color:'#64748b',textAlign:'center',wordBreak:'break-word',lineHeight:1.3}}>{item.file.name}</span>
+                    <span style={{fontSize:12,color:'var(--text-3)',textAlign:'center',wordBreak:'break-word',lineHeight:1.3}}>{item.file.name}</span>
                   </div>
               }
-              {item.status==='pending' && <button onClick={()=>removeFile(item.id)} style={{position:'absolute',top:6,right:6,width:22,height:22,background:'rgba(0,0,0,.75)',border:'none',borderRadius:'50%',color:'#fff',cursor:'pointer',fontSize:11,display:'grid',placeItems:'center'}}>✕</button>}
+              {item.status==='pending' && <button onClick={()=>removeFile(item.id)} style={{position:'absolute',top:6,right:6,width:22,height:22,background:'rgba(0,0,0,.75)',border:'none',borderRadius:'50%',color:'#fff',cursor:'pointer',fontSize:12.5,display:'grid',placeItems:'center'}}>✕</button>}
               {item.status==='processing' && <div style={{position:'absolute',inset:0,background:'rgba(99,102,241,.2)',display:'grid',placeItems:'center'}}><div style={{width:28,height:28,border:'3px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite'}}/></div>}
               <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'3px 6px',background:'rgba(0,0,0,.65)',backdropFilter:'blur(4px)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontSize:9,color:'#64748b',fontWeight:600,textTransform:'uppercase'}}>{item.fileType}</span>
-                <span style={{fontSize:10,fontWeight:700,color:sColor(item.status)}}>{sLabel(item.status)}</span>
+                <span style={{fontSize:9,color:'var(--text-3)',fontWeight:600,textTransform:'uppercase'}}>{item.fileType}</span>
+                <span style={{fontSize:12,fontWeight:700,color:sColor(item.status)}}>{sLabel(item.status)}</span>
               </div>
             </div>
           ))}
@@ -251,14 +251,14 @@ export default function UploadPage({ user, profile, onNavigate }) {
       )}
 
       {pendingFiles.length>0 && (
-        <div style={{background:'#1a1f2e',borderRadius:16,border:'1px solid rgba(255,255,255,.06)',padding:24}}>
+        <div style={{background:'var(--surface)',borderRadius:16,border:'1px solid var(--border)',padding:24}}>
           <div style={{marginBottom:16}}>
-            <label style={{fontSize:13,color:'#94a3b8',display:'block',marginBottom:6}}>Note (optionnel)</label>
+            <label style={{fontSize:13,color:'var(--text-2)',display:'block',marginBottom:6}}>Note (optionnel)</label>
             <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex: Déplacement client, réunion de projet…"
-              style={{width:'100%',background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.1)',borderRadius:10,color:'#e2e8f0',padding:'12px 16px',fontFamily:'inherit',fontSize:14,outline:'none'}} />
+              style={{width:'100%',background:'var(--field)',border:'1px solid var(--border-strong)',borderRadius:10,color:'var(--text)',padding:'12px 16px',fontFamily:'inherit',fontSize:14,outline:'none'}} />
           </div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
-            <span style={{fontSize:13,color:'#475569'}}>
+            <span style={{fontSize:13,color:'var(--text-3)'}}>
               {batchProcessing ? `⟳ Traitement… ${doneCount}/${pendingFiles.length}` : `${pendingFiles.filter(p=>p.status==='pending').length} fichier(s) prêt(s)`}
             </span>
             <button onClick={processAll} disabled={batchProcessing||pendingFiles.filter(p=>p.status==='pending').length===0}

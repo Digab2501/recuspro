@@ -26,16 +26,63 @@ const COLUMNS = [
   { key:'categorie',       label:'Catégorie',   filterVal: r => r.categorie || VIDE,              sortVal: r => (r.categorie || '').toLowerCase() },
   { key:'description',     label:'Descriptif',  filterVal: r => r.description || VIDE,            sortVal: r => (r.description || '').toLowerCase() },
   { key:'ht',              label:'Hors taxe',   filterVal: r => fmt(calcTaxes(r).ht) + ' $',      sortVal: r => calcTaxes(r).ht,        num:true },
-  { key:'tps',             label:'TPS',         filterVal: r => fmt(calcTaxes(r).tps) + ' $',     sortVal: r => calcTaxes(r).tps,       num:true },
-  { key:'tvq',             label:'TVQ',         filterVal: r => fmt(calcTaxes(r).tvq) + ' $',     sortVal: r => calcTaxes(r).tvq,       num:true },
-  { key:'ttc',             label:'Avec taxes',  filterVal: r => fmt(calcTaxes(r).ttc) + ' $',     sortVal: r => calcTaxes(r).ttc,       num:true },
+  { key:'taxes',           label:'Taxes',       filterVal: r => fmt(calcTaxes(r).tps + calcTaxes(r).tvq) + ' $', sortVal: r => calcTaxes(r).tps + calcTaxes(r).tvq, num:true, hint:'TPS + TVQ' },
+  { key:'tps',             label:'TPS',         filterVal: r => fmt(calcTaxes(r).tps) + ' $',     sortVal: r => calcTaxes(r).tps,       num:true, hidden:true },
+  { key:'tvq',             label:'TVQ',         filterVal: r => fmt(calcTaxes(r).tvq) + ' $',     sortVal: r => calcTaxes(r).tvq,       num:true, hidden:true },
+  { key:'ttc',             label:'Avec taxes',  filterVal: r => fmt(calcTaxes(r).ttc) + ' $',     sortVal: r => calcTaxes(r).ttc,       num:true, hidden:true },
   { key:'pourboire',       label:'Pourboire',   filterVal: r => calcTaxes(r).pourboire > 0 ? fmt(calcTaxes(r).pourboire) + ' $' : VIDE, sortVal: r => calcTaxes(r).pourboire, num:true },
   { key:'total',           label:'Total',       filterVal: r => fmt(calcTaxes(r).total) + ' $',   sortVal: r => calcTaxes(r).total,     num:true },
   { key:'numero_projet',   label:'N° Projet',   filterVal: r => r.numero_projet || VIDE,          sortVal: r => (r.numero_projet || '').toLowerCase() },
   { key:'employe_nom',     label:'Employé',     filterVal: r => r.employe_nom || VIDE,            sortVal: r => (r.employe_nom || '').toLowerCase(),     approbOnly:true },
-  { key:'approbateur_nom', label:'Approbateur', filterVal: r => r.approbateur_nom || VIDE,        sortVal: r => (r.approbateur_nom || '').toLowerCase(), approbOnly:true },
+  { key:'approbateur_nom', label:'Approbateur', filterVal: r => r.approbateur_nom || VIDE,        sortVal: r => (r.approbateur_nom || '').toLowerCase(), approbOnly:true, hidden:true },
   { key:'statut',          label:'Statut',      filterVal: r => r.statut || VIDE,                 sortVal: r => (r.statut || '').toLowerCase() },
 ];
+
+// Colonnes affichées : choix mémorisé dans le navigateur
+const COLS_STORAGE_KEY = 'recuspro-colonnes';
+const defaultHiddenCols = () => COLUMNS.filter(c => c.hidden).map(c => c.key);
+const loadHiddenCols = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLS_STORAGE_KEY));
+    if (Array.isArray(saved)) return saved;
+  } catch (e) { /* stockage indisponible */ }
+  return defaultHiddenCols();
+};
+
+// Pastille de catégorie lisible dans les deux thèmes
+const chipStyle = (color) => ({
+  display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:600,
+  background:`color-mix(in srgb, ${color} 16%, transparent)`,
+  color:`color-mix(in srgb, ${color} 72%, var(--chip-mix))`,
+  border:`1px solid color-mix(in srgb, ${color} 30%, transparent)`,
+  whiteSpace:'nowrap',
+});
+
+// ── Menu de choix des colonnes ──
+function ColumnsMenu({ columns, hiddenCols, onChange, onReset, onClose, anchor }) {
+  const left = Math.min(anchor.right - 240, window.innerWidth - 250);
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:999 }} />
+      <div style={{ position:'fixed', top:anchor.bottom + 6, left:Math.max(8, left), width:240, zIndex:1000,
+        background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:10, boxShadow:'0 12px 32px var(--shadow)', padding:8 }}>
+        <div style={{ fontSize:13, fontWeight:700, color:'var(--text-3)', padding:'4px 8px 8px', textTransform:'uppercase', letterSpacing:.5 }}>Colonnes affichées</div>
+        {columns.map(c => (
+          <label key={c.key} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 8px', fontSize:14, color:'var(--text)', cursor:'pointer', borderRadius:6 }}>
+            <input type="checkbox" checked={!hiddenCols.includes(c.key)} style={{ accentColor:'var(--accent)', width:16, height:16 }}
+              onChange={() => onChange(hiddenCols.includes(c.key) ? hiddenCols.filter(k => k !== c.key) : [...hiddenCols, c.key])} />
+            {c.label}
+            {c.hint && <span style={{ fontSize:13, color:'var(--text-3)' }}>({c.hint})</span>}
+          </label>
+        ))}
+        <button onClick={onReset}
+          style={{ width:'100%', marginTop:6, background:'var(--field)', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:6, padding:'8px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+          Rétablir par défaut
+        </button>
+      </div>
+    </>
+  );
+}
 
 // ── Menu de filtre style Excel ──
 function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onClose, anchor }) {
@@ -69,17 +116,17 @@ function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onCl
 
   const menuBtn = (active) => ({
     width:'100%', textAlign:'left', background: active ? 'rgba(99,102,241,.15)' : 'transparent', border:'none',
-    color: active ? '#a5b4fc' : '#cbd5e1', padding:'7px 10px', borderRadius:6, fontSize:12, cursor:'pointer', fontFamily:'inherit',
+    color: active ? 'var(--accent-text)' : 'var(--text-2)', padding:'7px 10px', borderRadius:6, fontSize:13.5, cursor:'pointer', fontFamily:'inherit',
   });
 
-  const left = Math.min(anchor.left, window.innerWidth - 270);
+  const left = Math.min(anchor.left, window.innerWidth - 290);
 
   return (
     <>
       <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:999 }} />
       <div onClick={e => e.stopPropagation()}
-        style={{ position:'fixed', top:anchor.bottom + 4, left: Math.max(8, left), width:260, zIndex:1000,
-          background:'#1e2433', border:'1px solid rgba(255,255,255,.1)', borderRadius:10, boxShadow:'0 12px 32px rgba(0,0,0,.5)',
+        style={{ position:'fixed', top:anchor.bottom + 4, left: Math.max(8, left), width:280, zIndex:1000,
+          background:'var(--surface-2)', border:'1px solid var(--border-strong)', borderRadius:10, boxShadow:'0 12px 32px var(--shadow)',
           padding:8, textTransform:'none', letterSpacing:0, fontWeight:400 }}>
         <button style={menuBtn(sort.key === col.key && sort.dir === 'asc')}  onClick={() => onSort(col.key, 'asc')}>
           ↑ Trier {col.num ? 'du plus petit au plus grand' : 'de A à Z'}
@@ -87,35 +134,35 @@ function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onCl
         <button style={menuBtn(sort.key === col.key && sort.dir === 'desc')} onClick={() => onSort(col.key, 'desc')}>
           ↓ Trier {col.num ? 'du plus grand au plus petit' : 'de Z à A'}
         </button>
-        <div style={{ height:1, background:'rgba(255,255,255,.07)', margin:'6px 0' }} />
+        <div style={{ height:1, background:'var(--border)', margin:'6px 0' }} />
         <input autoFocus placeholder="Rechercher…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ width:'100%', boxSizing:'border-box', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)',
-            borderRadius:6, color:'#e2e8f0', padding:'6px 10px', fontSize:12, fontFamily:'inherit', outline:'none', marginBottom:6 }} />
-        <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid rgba(255,255,255,.05)', borderRadius:6, padding:'4px 0' }}>
-          <label style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:12, color:'#e2e8f0', cursor:'pointer', fontWeight:600 }}>
+          style={{ width:'100%', boxSizing:'border-box', background:'var(--field)', border:'1px solid var(--border-strong)',
+            borderRadius:6, color:'var(--text)', padding:'6px 10px', fontSize:13.5, fontFamily:'inherit', outline:'none', marginBottom:6 }} />
+        <div style={{ maxHeight:220, overflowY:'auto', border:'1px solid var(--border)', borderRadius:6, padding:'4px 0' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:13.5, color:'var(--text)', cursor:'pointer', fontWeight:600 }}>
             <input type="checkbox" checked={allVisibleChecked} onChange={toggleAll} />
             (Tout sélectionner)
           </label>
           {visible.map(v => (
-            <label key={v} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:12, color:'#cbd5e1', cursor:'pointer' }}>
+            <label key={v} style={{ display:'flex', alignItems:'center', gap:8, padding:'5px 10px', fontSize:13.5, color:'var(--text-2)', cursor:'pointer' }}>
               <input type="checkbox" checked={draft.has(v)} onChange={() => toggle(v)} />
               <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v}</span>
             </label>
           ))}
-          {visible.length === 0 && <div style={{ padding:'8px 10px', fontSize:12, color:'#64748b' }}>Aucun résultat</div>}
+          {visible.length === 0 && <div style={{ padding:'8px 10px', fontSize:13.5, color:'var(--text-3)' }}>Aucun résultat</div>}
         </div>
         <div style={{ display:'flex', gap:6, marginTop:8, justifyContent:'space-between' }}>
           <button onClick={() => onApply(null)}
-            style={{ background:'transparent', border:'none', color:'#f87171', fontSize:12, cursor:'pointer', fontFamily:'inherit', padding:'6px 4px' }}>
+            style={{ background:'transparent', border:'none', color:'var(--danger-text)', fontSize:13.5, cursor:'pointer', fontFamily:'inherit', padding:'6px 4px' }}>
             Effacer
           </button>
           <div style={{ display:'flex', gap:6 }}>
             <button onClick={onClose}
-              style={{ background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', color:'#94a3b8', borderRadius:6, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              style={{ background:'var(--field)', border:'1px solid var(--border-strong)', color:'var(--text-2)', borderRadius:6, padding:'6px 12px', fontSize:13.5, cursor:'pointer', fontFamily:'inherit' }}>
               Annuler
             </button>
             <button onClick={apply} disabled={draft.size === 0}
-              style={{ background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', color:'#fff', borderRadius:6, padding:'6px 14px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: draft.size === 0 ? .5 : 1 }}>
+              style={{ background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', color:'#fff', borderRadius:6, padding:'6px 14px', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: draft.size === 0 ? .5 : 1 }}>
               OK
             </button>
           </div>
@@ -140,6 +187,8 @@ export default function ReceiptsPage({ user, profile }) {
   const [openMenu,     setOpenMenu]     = useState(null);            // { key, anchor }
   const [selectedIds,  setSelectedIds]  = useState(() => new Set());  // reçus cochés
   const [bulkBusy,     setBulkBusy]     = useState('');               // message pendant une action groupée
+  const [hiddenCols,   setHiddenCols]   = useState(loadHiddenCols);   // colonnes masquées
+  const [colsMenu,     setColsMenu]     = useState(null);             // position du menu « Colonnes »
 
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
@@ -225,7 +274,12 @@ export default function ReceiptsPage({ user, profile }) {
     a.click();
   };
 
-  const visibleColumns = COLUMNS.filter(c => !c.approbOnly || isApprobateur);
+  const availableColumns = COLUMNS.filter(c => !c.approbOnly || isApprobateur);
+  const visibleColumns   = availableColumns.filter(c => !hiddenCols.includes(c.key));
+  const saveHiddenCols = (cols) => {
+    setHiddenCols(cols);
+    try { localStorage.setItem(COLS_STORAGE_KEY, JSON.stringify(cols)); } catch (e) { /* stockage indisponible */ }
+  };
 
   // 1) Filtres du haut (période, catégorie, statut)
   const baseFiltered = receipts.filter(r => {
@@ -368,15 +422,15 @@ export default function ReceiptsPage({ user, profile }) {
   }, { ht:0, tps:0, tvq:0, pourboire:0, ttc:0 });
 
   const statStyle = (s) => ({
-    'En attente': { bg:'rgba(245,158,11,.15)',  color:'#f59e0b' },
-    'Approuvé':   { bg:'rgba(16,185,129,.15)',  color:'#10b981' },
-    'Rejeté':     { bg:'rgba(239,68,68,.15)',   color:'#ef4444' },
-  }[s] || { bg:'rgba(100,116,139,.15)', color:'#64748b' });
+    'En attente': { background:'rgba(245,158,11,.15)',  color:'var(--warn-text)' },
+    'Approuvé':   { background:'rgba(16,185,129,.15)',  color:'var(--success-text)' },
+    'Rejeté':     { background:'rgba(239,68,68,.15)',   color:'var(--danger-text)' },
+  }[s] || { background:'rgba(100,116,139,.15)', color:'var(--text-3)' });
 
   const inputStyle = {
-    background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)',
-    borderRadius:8, color:'#e2e8f0', padding:'7px 12px',
-    fontFamily:'inherit', fontSize:13, outline:'none',
+    background:'var(--field)', border:'1px solid var(--border-strong)',
+    borderRadius:8, color:'var(--text)', padding:'8px 12px',
+    fontFamily:'inherit', fontSize:14, outline:'none', height:38,
   };
 
   // ══════════════════════════════════════════════
@@ -384,14 +438,14 @@ export default function ReceiptsPage({ user, profile }) {
   // ══════════════════════════════════════════════
   if (selected) {
     const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(selected);
-    const cat = CATEGORIES[selected.categorie] || { icon:'📋', color:'#94a3b8' };
+    const cat = CATEGORIES[selected.categorie] || { icon:'📋', color:'var(--text-2)' };
     return (
       <div style={{ maxWidth:720 }}>
 
         {/* Boutons d'action */}
         <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
           <button onClick={() => { setSelected(null); setEditing(false); }}
-            style={{ background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.07)', borderRadius:10, color:'#94a3b8', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ background:'var(--field)', border:'1px solid var(--border)', borderRadius:10, color:'var(--text-2)', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
             ← Retour
           </button>
           <button onClick={() => {
@@ -405,12 +459,12 @@ export default function ReceiptsPage({ user, profile }) {
             });
             setEditing(true);
           }}
-            style={{ background:'rgba(99,102,241,.1)', border:'1px solid rgba(99,102,241,.2)', borderRadius:10, color:'#a5b4fc', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ background:'rgba(99,102,241,.1)', border:'1px solid rgba(99,102,241,.2)', borderRadius:10, color:'var(--accent-text)', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
             ✏️ Modifier
           </button>
           {(isAdmin || selected.user_id === user.id) && (
             <button onClick={() => deleteReceipt(selected.id)}
-              style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', borderRadius:10, color:'#f87171', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+              style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', borderRadius:10, color:'var(--danger-text)', padding:'9px 18px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
               🗑 Supprimer
             </button>
           )}
@@ -418,8 +472,8 @@ export default function ReceiptsPage({ user, profile }) {
 
         {/* Formulaire d'édition */}
         {editing && (
-          <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(99,102,241,.3)', padding:24, marginBottom:16 }}>
-            <div style={{ fontSize:12, color:'#6366f1', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:16 }}>✏️ Modifier le reçu</div>
+          <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid rgba(99,102,241,.3)', padding:24, marginBottom:16 }}>
+            <div style={{ fontSize:13, color:'var(--accent)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:16 }}>✏️ Modifier le reçu</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               {[
                 ['Montant HT ($)', 'montant_ht',    'number'],
@@ -428,22 +482,22 @@ export default function ReceiptsPage({ user, profile }) {
                 ['N° Projet',     'numero_projet',  'text'  ],
               ].map(([label, key, type]) => (
                 <div key={key}>
-                  <label style={{ fontSize:11, color:'#64748b', display:'block', marginBottom:4 }}>{label}</label>
+                  <label style={{ fontSize:12.5, color:'var(--text-3)', display:'block', marginBottom:4 }}>{label}</label>
                   <input type={type} value={editForm[key] || ''} onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
-                    style={{ width:'100%', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'#e2e8f0', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none', boxSizing:'border-box' }} />
+                    style={{ width:'100%', background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:8, color:'var(--text)', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none', boxSizing:'border-box' }} />
                 </div>
               ))}
               <div style={{ gridColumn:'1/-1' }}>
-                <label style={{ fontSize:11, color:'#64748b', display:'block', marginBottom:4 }}>Catégorie</label>
+                <label style={{ fontSize:12.5, color:'var(--text-3)', display:'block', marginBottom:4 }}>Catégorie</label>
                 <select value={editForm.categorie || ''} onChange={e => setEditForm(f => ({ ...f, categorie: e.target.value }))}
-                  style={{ width:'100%', background:'#1a1f2e', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'#e2e8f0', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none' }}>
+                  style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:8, color:'var(--text)', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none' }}>
                   {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{CATEGORIES[c].icon} {c}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn:'1/-1' }}>
-                <label style={{ fontSize:11, color:'#64748b', display:'block', marginBottom:4 }}>Descriptif</label>
+                <label style={{ fontSize:12.5, color:'var(--text-3)', display:'block', marginBottom:4 }}>Descriptif</label>
                 <input value={editForm.description || ''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                  style={{ width:'100%', background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.1)', borderRadius:8, color:'#e2e8f0', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none', boxSizing:'border-box' }} />
+                  style={{ width:'100%', background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:8, color:'var(--text)', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none', boxSizing:'border-box' }} />
               </div>
             </div>
             <div style={{ display:'flex', gap:8, marginTop:16 }}>
@@ -452,7 +506,7 @@ export default function ReceiptsPage({ user, profile }) {
                 💾 Sauvegarder
               </button>
               <button onClick={() => setEditing(false)}
-                style={{ background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.07)', color:'#94a3b8', borderRadius:8, padding:'10px 20px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
+                style={{ background:'var(--field)', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:8, padding:'10px 20px', fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>
                 Annuler
               </button>
             </div>
@@ -463,16 +517,16 @@ export default function ReceiptsPage({ user, profile }) {
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:24, flexWrap:'wrap', gap:12 }}>
           <div>
             <h1 style={{ fontSize:22, fontWeight:700, marginBottom:4 }}>{selected.fournisseur}</h1>
-            <span style={{ fontSize:12, color:'#475569' }}>{selected.employe_nom} · {selected.date || 'date inconnue'}</span>
+            <span style={{ fontSize:13, color:'var(--text-3)' }}>{selected.employe_nom} · {selected.date || 'date inconnue'}</span>
           </div>
           {canApprove && (
             <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
               {STATUTS.map(s => (
                 <button key={s} onClick={() => updateStatut(selected.id, s)}
-                  style={{ padding:'8px 14px', borderRadius:10, border:'1px solid', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
-                    background:  selected.statut === s ? statStyle(s).bg  : 'rgba(255,255,255,.03)',
-                    color:       selected.statut === s ? statStyle(s).color : '#475569',
-                    borderColor: selected.statut === s ? `${statStyle(s).color}44` : 'rgba(255,255,255,.07)' }}>
+                  style={{ padding:'8px 14px', borderRadius:10, border:'1px solid', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                    background:  selected.statut === s ? statStyle(s).background : 'var(--hover)',
+                    color:       selected.statut === s ? statStyle(s).color : 'var(--text-3)',
+                    borderColor: selected.statut === s ? `color-mix(in srgb, ${statStyle(s).color} 40%, transparent)` : 'var(--border)' }}>
                   {s}
                 </button>
               ))}
@@ -482,8 +536,8 @@ export default function ReceiptsPage({ user, profile }) {
 
         {/* Infos + Taxes */}
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
-          <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(255,255,255,.06)', padding:20 }}>
-            <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Informations</div>
+          <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:20 }}>
+            <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Informations</div>
             {[
               ['Catégorie',      `${cat.icon} ${selected.categorie}`],
               ['N° Projet',      selected.numero_projet    || '—'],
@@ -493,41 +547,41 @@ export default function ReceiptsPage({ user, profile }) {
               ['N° reçu',        selected.numero_recu      || '—'],
               ['Note',           selected.note             || '—'],
             ].map(([k, v]) => (
-              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-                <span style={{ color:'#64748b' }}>{k}</span>
-                <span style={{ color:'#e2e8f0', textAlign:'right', maxWidth:'60%' }}>{v}</span>
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+                <span style={{ color:'var(--text-3)' }}>{k}</span>
+                <span style={{ color:'var(--text)', textAlign:'right', maxWidth:'60%' }}>{v}</span>
               </div>
             ))}
           </div>
-          <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(255,255,255,.06)', padding:20 }}>
-            <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Détail des montants</div>
+          <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:20 }}>
+            <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Détail des montants</div>
             {[
-              ['Hors taxe',    fmt(ht),  '#e2e8f0'],
-              ['TPS (5%)',     fmt(tps), '#94a3b8'],
-              ['TVQ (9.975%)', fmt(tvq), '#94a3b8'],
-              ['Pourboire',    fmt(pourboire), '#94a3b8'],
+              ['Hors taxe',    fmt(ht),  'var(--text)'],
+              ['TPS (5%)',     fmt(tps), 'var(--text-2)'],
+              ['TVQ (9.975%)', fmt(tvq), 'var(--text-2)'],
+              ['Pourboire',    fmt(pourboire), 'var(--text-2)'],
             ].map(([k, v, c]) => (
-              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-                <span style={{ color:'#64748b' }}>{k}</span>
+              <div key={k} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+                <span style={{ color:'var(--text-3)' }}>{k}</span>
                 <span style={{ color:c, fontFamily:"'DM Mono',monospace" }}>{v} $</span>
               </div>
             ))}
-            <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-              <span style={{ color:'#64748b' }}>Avec taxes</span>
-              <span style={{ color:'#e2e8f0', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} $</span>
+            <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+              <span style={{ color:'var(--text-3)' }}>Avec taxes</span>
+              <span style={{ color:'var(--text)', fontFamily:"'DM Mono',monospace" }}>{fmt(ttc)} $</span>
             </div>
             {pourboire > 0 && (
-              <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
-                <span style={{ color:'#64748b' }}>Pourboire</span>
-                <span style={{ color:'#f59e0b', fontFamily:"'DM Mono',monospace" }}>{fmt(pourboire)} $</span>
+              <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
+                <span style={{ color:'var(--text-3)' }}>Pourboire</span>
+                <span style={{ color:'var(--warn-text)', fontFamily:"'DM Mono',monospace" }}>{fmt(pourboire)} $</span>
               </div>
             )}
             <div style={{ display:'flex', justifyContent:'space-between', padding:'10px 0 0', fontSize:16, fontWeight:700 }}>
-              <span style={{ color:'#94a3b8' }}>Total</span>
-              <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(total)} {selected.devise || 'CAD'}</span>
+              <span style={{ color:'var(--text-2)' }}>Total</span>
+              <span style={{ color:'var(--accent-text)', fontFamily:"'DM Mono',monospace" }}>{fmt(total)} {selected.devise || 'CAD'}</span>
             </div>
             <div style={{ marginTop:14 }}>
-              <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, fontSize:12, fontWeight:700, ...statStyle(selected.statut) }}>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 12px', borderRadius:20, fontSize:13, fontWeight:700, ...statStyle(selected.statut) }}>
                 {selected.statut}
               </span>
             </div>
@@ -536,39 +590,39 @@ export default function ReceiptsPage({ user, profile }) {
 
         {/* Description */}
         {selected.description && (
-          <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(255,255,255,.06)', padding:20, marginBottom:16, fontSize:13, color:'#94a3b8', lineHeight:1.6 }}>
-            <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Descriptif</div>
+          <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:20, marginBottom:16, fontSize:13, color:'var(--text-2)', lineHeight:1.6 }}>
+            <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:8 }}>Descriptif</div>
             {selected.description}
           </div>
         )}
 
         {/* Items */}
         {selected.items?.length > 0 && (
-          <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(255,255,255,.06)', padding:20, marginBottom:16 }}>
-            <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Articles détectés</div>
+          <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:20, marginBottom:16 }}>
+            <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Articles détectés</div>
             {selected.items.map((item, i) => (
-              <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid rgba(255,255,255,.04)', fontSize:13 }}>
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid var(--border)', fontSize:13 }}>
                 <span>{item.nom}</span>
-                <span style={{ color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>{fmt(item.montant)} $</span>
+                <span style={{ color:'var(--accent-text)', fontFamily:"'DM Mono',monospace" }}>{fmt(item.montant)} $</span>
               </div>
             ))}
           </div>
         )}
 
         {/* Document */}
-        <div style={{ background:'#1a1f2e', borderRadius:14, border:'1px solid rgba(255,255,255,.06)', padding:16 }}>
-          <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Document source</div>
+        <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', padding:16 }}>
+          <div style={{ fontSize:12, color:'var(--text-3)', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:12 }}>Document source</div>
           {selected.preview_url || selected.file_url ? (
-            <img src={selected.preview_url || selected.file_url} alt="document" style={{ width:'100%', borderRadius:10, maxHeight:500, objectFit:'contain', background:'#0f1117' }} />
+            <img src={selected.preview_url || selected.file_url} alt="document" style={{ width:'100%', borderRadius:10, maxHeight:500, objectFit:'contain', background:'var(--bg)' }} />
           ) : (
-            <div style={{ background:'#0f1117', borderRadius:10, padding:32, textAlign:'center' }}>
+            <div style={{ background:'var(--bg)', borderRadius:10, padding:32, textAlign:'center' }}>
               <div style={{ fontSize:48, marginBottom:10 }}>{getFileIcon(selected.file_type)}</div>
-              <div style={{ fontSize:13, color:'#475569' }}>{selected.file_name}</div>
+              <div style={{ fontSize:13, color:'var(--text-3)' }}>{selected.file_name}</div>
             </div>
           )}
           {selected.file_url && (
             <a href={selected.file_url} target="_blank" rel="noreferrer"
-              style={{ display:'inline-flex', alignItems:'center', gap:6, marginTop:12, color:'#6366f1', fontSize:13, textDecoration:'none', fontWeight:600 }}>
+              style={{ display:'inline-flex', alignItems:'center', gap:6, marginTop:12, color:'var(--accent)', fontSize:13, textDecoration:'none', fontWeight:600 }}>
               ⬇ Télécharger le document original
             </a>
           )}
@@ -580,85 +634,104 @@ export default function ReceiptsPage({ user, profile }) {
   // ══════════════════════════════════════════════
   // VUE LISTE
   // ══════════════════════════════════════════════
+  const num = { fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap', textAlign:'right' };
+  const cellPad = '12px 12px';
+
+  // Contenu d'une cellule selon la colonne
+  const renderCell = (col, r, t) => {
+    switch (col.key) {
+      case 'date':          return <span style={{ color:'var(--text-2)', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>{r.date || '—'}</span>;
+      case 'fournisseur':   return <span title={r.fournisseur || ''} style={{ fontWeight:600, color:'var(--text)', display:'block', maxWidth:230, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.fournisseur || '—'}</span>;
+      case 'categorie': {
+        const cat = CATEGORIES[r.categorie] || { icon:'📋', color:'#94a3b8' };
+        return r.categorie ? <span style={chipStyle(cat.color)}>{cat.icon} {r.categorie}</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
+      }
+      case 'description':   return <span title={r.description || ''} style={{ color:'var(--text-2)', display:'block', maxWidth:230, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.description || '—'}</span>;
+      case 'ht':            return <span style={{ color:'var(--text)' }}>{fmt(t.ht)} $</span>;
+      case 'taxes':         return <span style={{ color:'var(--text-2)' }} title={`TPS ${fmt(t.tps)} $ · TVQ ${fmt(t.tvq)} $`}>{fmt(t.tps + t.tvq)} $</span>;
+      case 'tps':           return <span style={{ color:'var(--text-2)' }}>{fmt(t.tps)} $</span>;
+      case 'tvq':           return <span style={{ color:'var(--text-2)' }}>{fmt(t.tvq)} $</span>;
+      case 'ttc':           return <span style={{ color:'var(--text)' }}>{fmt(t.ttc)} $</span>;
+      case 'pourboire':     return t.pourboire > 0 ? <span style={{ color:'var(--warn-text)', fontWeight:600 }}>{fmt(t.pourboire)} $</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
+      case 'total':         return <span style={{ color:'var(--text)', fontWeight:700, fontSize:15 }}>{fmt(t.total)} $</span>;
+      case 'numero_projet': return r.numero_projet ? <span style={{ color:'var(--accent-text)', fontWeight:600, whiteSpace:'nowrap' }}>{r.numero_projet}</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
+      case 'employe_nom':   return <span style={{ color:'var(--text)', whiteSpace:'nowrap' }}>{r.employe_nom || '—'}</span>;
+      case 'approbateur_nom': return <span style={{ color:'var(--text-2)', whiteSpace:'nowrap' }}>{r.approbateur_nom || '—'}</span>;
+      case 'statut':        return <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap', ...statStyle(r.statut) }}>
+                                     <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor' }} />{r.statut}
+                                   </span>;
+      default:              return null;
+    }
+  };
+
+  const labelStyle = { fontSize:13, color:'var(--text-2)', fontWeight:600 };
+  const selectStyle = { ...inputStyle, paddingRight:30, cursor:'pointer', minWidth:170 };
+  const hasTopFilters = filterDateDe || filterDateA || filterCat !== 'Toutes' || filterStat !== 'Tous';
+
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:12 }}>
         <div>
-          <h1 style={{ fontSize:22, fontWeight:700, marginBottom:4 }}>{isApprobateur ? 'Tous les reçus' : 'Mes reçus'}</h1>
-          <p style={{ color:'#64748b', fontSize:14 }}>{filtered.length} reçu(s) affiché(s)</p>
+          <h1 style={{ fontSize:26, fontWeight:700, marginBottom:4, color:'var(--text)' }}>{isApprobateur ? 'Tous les reçus' : 'Mes reçus'}</h1>
+          <p style={{ color:'var(--text-2)', fontSize:15 }}>{filtered.length} reçu(s) affiché(s)</p>
         </div>
         {isApprobateur && (
           <button onClick={downloadCSV}
-            style={{ background:'rgba(255,255,255,.05)', border:'1px solid rgba(255,255,255,.07)', color:'#94a3b8', borderRadius:10, padding:'10px 18px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ background:'var(--surface)', border:'1px solid var(--border-strong)', color:'var(--text)', borderRadius:10, padding:'10px 18px', fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
             📥 Exporter CSV
           </button>
         )}
       </div>
 
-      {/* Filtres période */}
-      <div style={{ background:'#1a1f2e', border:'1px solid rgba(255,255,255,.06)', borderRadius:12, padding:'14px 18px', marginBottom:16, display:'flex', gap:12, flexWrap:'wrap', alignItems:'center' }}>
-        <span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>📅 Période :</span>
+      {/* Barre de filtres : période, catégorie, statut, colonnes */}
+      <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 18px', marginBottom:16, display:'flex', gap:'12px 20px', flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <label style={{ fontSize:12, color:'#64748b' }}>De :</label>
+          <span style={labelStyle}>📅 Du</span>
           <input type="date" value={filterDateDe} onChange={e => setFilterDateDe(e.target.value)} style={inputStyle} />
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          <label style={{ fontSize:12, color:'#64748b' }}>À :</label>
+          <span style={labelStyle}>au</span>
           <input type="date" value={filterDateA} onChange={e => setFilterDateA(e.target.value)} style={inputStyle} />
         </div>
-        {(filterDateDe || filterDateA) && (
-          <button onClick={() => { setFilterDateDe(''); setFilterDateA(''); }}
-            style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.2)', color:'#f87171', borderRadius:8, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
-            ✕ Réinitialiser
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={labelStyle}>Catégorie</span>
+          <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={selectStyle}>
+            <option value="Toutes">Toutes</option>
+            {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{CATEGORIES[c].icon} {c}</option>)}
+          </select>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={labelStyle}>Statut</span>
+          <select value={filterStat} onChange={e => setFilterStat(e.target.value)} style={{ ...selectStyle, minWidth:140 }}>
+            <option value="Tous">Tous</option>
+            {STATUTS.map(st => <option key={st} value={st}>{st}</option>)}
+          </select>
+        </div>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
+          {(hasTopFilters || activeColFilters > 0) && (
+            <button onClick={() => { setFilterDateDe(''); setFilterDateA(''); setFilterCat('Toutes'); setFilterStat('Tous'); setColFilters({}); }}
+              style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'var(--danger-text)', borderRadius:8, padding:'0 14px', height:38, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+              ✕ Effacer les filtres{activeColFilters > 0 ? ` (+${activeColFilters} colonne${activeColFilters > 1 ? 's' : ''})` : ''}
+            </button>
+          )}
+          <button onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); setColsMenu(m => m ? null : rect); }}
+            style={{ background:'var(--field)', border:'1px solid var(--border-strong)', color:'var(--text)', borderRadius:8, padding:'0 14px', height:38, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            ☰ Colonnes
           </button>
-        )}
-      </div>
-
-      {/* Filtres catégorie */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-        {['Toutes', ...Object.keys(CATEGORIES)].map(cat => (
-          <button key={cat} onClick={() => setFilterCat(cat)}
-            style={{ padding:'5px 11px', fontSize:11, borderRadius:20, border:'1px solid', cursor:'pointer', fontFamily:'inherit', fontWeight:500,
-              background:  filterCat === cat ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.03)',
-              color:       filterCat === cat ? '#a5b4fc' : '#64748b',
-              borderColor: filterCat === cat ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.07)' }}>
-            {cat !== 'Toutes' ? CATEGORIES[cat]?.icon+' ' : ''}{cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Filtres statut */}
-      <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:20 }}>
-        {['Tous', ...STATUTS].map(s => (
-          <button key={s} onClick={() => setFilterStat(s)}
-            style={{ padding:'5px 11px', fontSize:11, borderRadius:20, border:'1px solid', cursor:'pointer', fontFamily:'inherit', fontWeight:500,
-              background:  filterStat === s ? 'rgba(99,102,241,.2)' : 'rgba(255,255,255,.03)',
-              color:       filterStat === s ? '#a5b4fc' : '#64748b',
-              borderColor: filterStat === s ? 'rgba(99,102,241,.4)' : 'rgba(255,255,255,.07)' }}>
-            {s}
-          </button>
-        ))}
-        {activeColFilters > 0 && (
-          <button onClick={() => setColFilters({})}
-            style={{ marginLeft:'auto', padding:'5px 11px', fontSize:11, borderRadius:20, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.1)', color:'#f87171', cursor:'pointer', fontFamily:'inherit', fontWeight:600 }}>
-            ✕ Effacer les filtres de colonnes ({activeColFilters})
-          </button>
-        )}
+        </div>
       </div>
 
       {/* Sommaire taxes */}
       {filtered.length > 0 && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:12, marginBottom:20 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))', gap:12, marginBottom:20 }}>
           {[
-            { label:'Hors taxe',    value:fmt(totaux.ht),       color:'#e2e8f0' },
-            { label:'TPS (5%)',     value:fmt(totaux.tps),      color:'#94a3b8' },
-            { label:'TVQ (9.975%)', value:fmt(totaux.tvq),      color:'#94a3b8' },
-            { label:'Pourboire',    value:fmt(totaux.pourboire),color:'#94a3b8' },
-            { label:'Avec taxes',   value:fmt(totaux.ttc),      color:'#a5b4fc' },
+            { label:'Hors taxe',    value:fmt(totaux.ht) },
+            { label:'TPS (5 %)',    value:fmt(totaux.tps) },
+            { label:'TVQ (9,975 %)',value:fmt(totaux.tvq) },
+            { label:'Pourboire',    value:fmt(totaux.pourboire) },
+            { label:'Total',        value:fmt(totaux.ttc), strong:true },
           ].map(c => (
-            <div key={c.label} style={{ background:'#1a1f2e', borderRadius:10, border:'1px solid rgba(255,255,255,.06)', padding:'12px 16px' }}>
-              <div style={{ fontSize:10, color:'#475569', fontWeight:700, textTransform:'uppercase', letterSpacing:1, marginBottom:4 }}>{c.label}</div>
-              <div style={{ fontSize:18, fontWeight:700, color:c.color, fontFamily:"'DM Mono',monospace" }}>{c.value} $</div>
+            <div key={c.label} style={{ background: c.strong ? 'rgba(99,102,241,.1)' : 'var(--surface)', borderRadius:12, border:`1px solid ${c.strong ? 'rgba(99,102,241,.35)' : 'var(--border)'}`, padding:'14px 18px' }}>
+              <div style={{ fontSize:13, color:'var(--text-2)', fontWeight:600, marginBottom:6 }}>{c.label}</div>
+              <div style={{ fontSize:22, fontWeight:700, color: c.strong ? 'var(--accent-text)' : 'var(--text)', fontVariantNumeric:'tabular-nums' }}>{c.value} $</div>
             </div>
           ))}
         </div>
@@ -669,31 +742,31 @@ export default function ReceiptsPage({ user, profile }) {
         const selTotal = selectedRows.reduce((s, r) => s + calcTaxes(r).total, 0);
         const nbDeletable = selectedRows.filter(canDeleteRow).length;
         const actionBtn = (bg, border, color) => ({
-          background:bg, border:`1px solid ${border}`, color, borderRadius:8, padding:'8px 14px', fontSize:13, fontWeight:600,
+          background:bg, border:`1px solid ${border}`, color, borderRadius:8, padding:'9px 16px', fontSize:14, fontWeight:600,
           cursor: bulkBusy ? 'wait' : 'pointer', fontFamily:'inherit', opacity: bulkBusy ? .6 : 1, whiteSpace:'nowrap',
         });
         return (
-          <div style={{ position:'sticky', top:0, zIndex:50, display:'flex', alignItems:'center', gap:10, flexWrap:'wrap',
-            background:'#232a3d', border:'1px solid rgba(99,102,241,.35)', borderRadius:12, padding:'10px 16px', marginBottom:12,
-            boxShadow:'0 8px 24px rgba(0,0,0,.35)' }}>
-            <span style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>
+          <div style={{ position:'sticky', top:0, zIndex:50, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
+            background:'var(--surface-2)', border:'1px solid rgba(99,102,241,.45)', borderRadius:12, padding:'12px 18px', marginBottom:12,
+            boxShadow:'0 8px 24px var(--shadow)' }}>
+            <span style={{ fontSize:15, fontWeight:700, color:'var(--text)' }}>
               {selectedRows.length} reçu(s) sélectionné(s)
             </span>
-            <span style={{ fontSize:13, color:'#a5b4fc', fontFamily:"'DM Mono',monospace" }}>· {fmt(selTotal)} $</span>
-            {bulkBusy && <span style={{ fontSize:12, color:'#94a3b8' }}>⏳ {bulkBusy}</span>}
+            <span style={{ fontSize:15, fontWeight:700, color:'var(--accent-text)', fontVariantNumeric:'tabular-nums' }}>{fmt(selTotal)} $</span>
+            {bulkBusy && <span style={{ fontSize:13, color:'var(--text-2)' }}>⏳ {bulkBusy}</span>}
             <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
               <button disabled={!!bulkBusy} onClick={downloadSelected}
-                style={actionBtn('rgba(99,102,241,.15)', 'rgba(99,102,241,.4)', '#c7d2fe')}>
+                style={actionBtn('rgba(99,102,241,.15)', 'rgba(99,102,241,.45)', 'var(--accent-text)')}>
                 ⬇ Télécharger les reçus (.zip)
               </button>
               {nbDeletable > 0 && (
                 <button disabled={!!bulkBusy} onClick={deleteSelected}
-                  style={actionBtn('rgba(239,68,68,.12)', 'rgba(239,68,68,.35)', '#f87171')}>
+                  style={actionBtn('rgba(239,68,68,.12)', 'rgba(239,68,68,.4)', 'var(--danger-text)')}>
                   🗑 Supprimer ({nbDeletable})
                 </button>
               )}
               <button disabled={!!bulkBusy} onClick={clearSelection}
-                style={actionBtn('rgba(255,255,255,.04)', 'rgba(255,255,255,.1)', '#94a3b8')}>
+                style={actionBtn('var(--field)', 'var(--border-strong)', 'var(--text-2)')}>
                 ✕ Désélectionner
               </button>
             </div>
@@ -703,34 +776,34 @@ export default function ReceiptsPage({ user, profile }) {
 
       {/* Tableau */}
       {loading ? (
-        <div style={{ textAlign:'center', padding:48, color:'#475569' }}>Chargement…</div>
+        <div style={{ textAlign:'center', padding:48, color:'var(--text-2)', fontSize:15 }}>Chargement…</div>
       ) : baseFiltered.length === 0 ? (
-        <div style={{ background:'#1a1f2e', borderRadius:16, border:'1px solid rgba(255,255,255,.06)', padding:48, textAlign:'center' }}>
+        <div style={{ background:'var(--surface)', borderRadius:16, border:'1px solid var(--border)', padding:48, textAlign:'center' }}>
           <div style={{ fontSize:40, marginBottom:12 }}>📂</div>
-          <div style={{ fontWeight:600, marginBottom:6 }}>Aucun reçu</div>
-          <div style={{ fontSize:13, color:'#475569' }}>Modifiez vos filtres ou soumettez un premier document</div>
+          <div style={{ fontWeight:600, marginBottom:6, fontSize:16 }}>Aucun reçu</div>
+          <div style={{ fontSize:14, color:'var(--text-2)' }}>Modifiez vos filtres ou soumettez un premier document</div>
         </div>
       ) : (
-        <div style={{ background:'#1a1f2e', borderRadius:16, border:'1px solid rgba(255,255,255,.06)', overflow:'hidden' }}>
+        <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
           <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', minWidth:900 }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14 }}>
               <thead>
-                <tr style={{ borderBottom:'1px solid rgba(255,255,255,.06)' }}>
-                  <th style={{ padding:'8px 4px 8px 14px', width:20 }}>
+                <tr style={{ background:'var(--surface-2)', borderBottom:'1px solid var(--border-strong)' }}>
+                  <th style={{ padding:'10px 4px 10px 16px', width:20 }}>
                     <input type="checkbox" title="Tout sélectionner"
                       checked={allChecked}
                       ref={el => { if (el) el.indeterminate = someChecked; }}
                       onChange={toggleAllRows}
-                      style={{ cursor:'pointer', accentColor:'#6366f1', width:15, height:15 }} />
+                      style={{ cursor:'pointer', accentColor:'var(--accent)', width:16, height:16 }} />
                   </th>
-                  <th style={{ padding:'12px' }} />
+                  <th style={{ width:36 }} title="Document" />
                   {visibleColumns.map(col => {
                     const isSorted   = sort.key === col.key;
                     const isFiltered = !!colFilters[col.key];
                     return (
-                      <th key={col.key} style={{ padding:'8px 6px 8px 12px', textAlign:'left', fontSize:10, fontWeight:600, color: isSorted || isFiltered ? '#a5b4fc' : '#475569', textTransform:'uppercase', letterSpacing:.5, whiteSpace:'nowrap' }}>
-                        <div style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
-                          <span onClick={() => clickHeader(col.key)} title="Cliquer pour trier"
+                      <th key={col.key} style={{ padding:'11px 10px 11px 14px', textAlign: col.num ? 'right' : 'left', fontSize:12.5, fontWeight:700, color: isSorted || isFiltered ? 'var(--accent-text)' : 'var(--text-2)', whiteSpace:'nowrap' }}>
+                        <div style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                          <span onClick={() => clickHeader(col.key)} title={col.hint ? `${col.hint} — cliquer pour trier` : 'Cliquer pour trier'}
                             style={{ cursor:'pointer', userSelect:'none' }}>
                             {col.label}{isSorted ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
                           </span>
@@ -739,76 +812,55 @@ export default function ReceiptsPage({ user, profile }) {
                               const rect = e.currentTarget.getBoundingClientRect();
                               setOpenMenu(m => m?.key === col.key ? null : { key: col.key, anchor: rect });
                             }}
-                            style={{ background: isFiltered ? 'rgba(99,102,241,.25)' : 'rgba(255,255,255,.04)', border:'1px solid', borderColor: isFiltered ? 'rgba(99,102,241,.5)' : 'rgba(255,255,255,.08)',
-                              color: isFiltered ? '#a5b4fc' : '#64748b', borderRadius:4, width:18, height:18, padding:0, fontSize:9, cursor:'pointer', lineHeight:1, display:'grid', placeItems:'center' }}>
+                            style={{ background: isFiltered ? 'rgba(99,102,241,.25)' : 'transparent', border:'1px solid', borderColor: isFiltered ? 'rgba(99,102,241,.55)' : 'var(--border-strong)',
+                              color: isFiltered ? 'var(--accent-text)' : 'var(--text-3)', borderRadius:5, width:20, height:20, padding:0, fontSize:12, cursor:'pointer', lineHeight:1, display:'grid', placeItems:'center' }}>
                             {isFiltered ? '⧩' : '▾'}
                           </button>
                         </div>
                       </th>
                     );
                   })}
-                  <th style={{ padding:'12px' }} />
+                  <th style={{ width:24 }} />
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={visibleColumns.length + 3}style={{ padding:32, textAlign:'center', fontSize:13, color:'#64748b' }}>
+                    <td colSpan={visibleColumns.length + 3} style={{ padding:32, textAlign:'center', fontSize:14, color:'var(--text-2)' }}>
                       Aucun reçu ne correspond aux filtres de colonnes.{' '}
                       <button onClick={() => setColFilters({})}
-                        style={{ background:'none', border:'none', color:'#a5b4fc', cursor:'pointer', fontFamily:'inherit', fontSize:13, textDecoration:'underline' }}>
+                        style={{ background:'none', border:'none', color:'var(--accent-text)', cursor:'pointer', fontFamily:'inherit', fontSize:14, textDecoration:'underline' }}>
                         Effacer les filtres
                       </button>
                     </td>
                   </tr>
                 )}
-                {filtered.map(r => {
-                  const { ht, tps, tvq, ttc, pourboire, total } = calcTaxes(r);
-                  const cat = CATEGORIES[r.categorie] || { icon:'📋', color:'#94a3b8' };
+                {filtered.map((r, idx) => {
+                  const t = calcTaxes(r);
                   const isChecked = selectedIds.has(r.id);
-                  const rowBg = isChecked ? 'rgba(99,102,241,.08)' : '';
+                  const rowBg = isChecked ? 'rgba(99,102,241,.12)' : (idx % 2 === 1 ? 'var(--row-alt)' : 'transparent');
                   return (
                     <tr key={r.id} onClick={() => setSelected(r)}
-                      style={{ borderBottom:'1px solid rgba(255,255,255,.04)', cursor:'pointer', transition:'background .15s', background: rowBg }}
-                      onMouseEnter={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,.12)' : 'rgba(255,255,255,.03)'}
+                      style={{ borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background .12s', background: rowBg }}
+                      onMouseEnter={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,.18)' : 'var(--hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = rowBg}>
                       <td onClick={e => { e.stopPropagation(); toggleRow(r.id); }}
-                        style={{ padding:'10px 4px 10px 14px', width:20, cursor:'pointer' }}>
+                        style={{ padding:'12px 4px 12px 16px', width:20, cursor:'pointer' }}>
                         <input type="checkbox" checked={isChecked} readOnly
-                          style={{ cursor:'pointer', accentColor:'#6366f1', width:15, height:15, pointerEvents:'none' }} />
+                          style={{ cursor:'pointer', accentColor:'var(--accent)', width:16, height:16, pointerEvents:'none' }} />
                       </td>
-                      <td style={{ padding:'10px 12px', width:44 }}>
-                        {r.preview_url
-                          ? <img src={r.preview_url} alt="" style={{ width:32, height:32, objectFit:'cover', borderRadius:6, display:'block' }} />
-                          : <div style={{ width:32, height:32, borderRadius:6, background:'#0f1117', display:'grid', placeItems:'center', fontSize:14 }}>{getFileIcon(r.file_type)}</div>}
+                      <td style={{ padding:'12px 4px', width:36, textAlign:'center' }}>
+                        {r.file_url ? (
+                          <a href={r.file_url} target="_blank" rel="noreferrer" title="Ouvrir le document" onClick={e => e.stopPropagation()}
+                            style={{ fontSize:16, textDecoration:'none', opacity:.85 }}>📎</a>
+                        ) : null}
                       </td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{r.date || '—'}</td>
-                      <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, whiteSpace:'nowrap' }}>{r.fournisseur}</td>
-                      <td style={{ padding:'10px 12px' }}>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:600, background:`${cat.color}20`, color:cat.color, whiteSpace:'nowrap' }}>
-                          {cat.icon} {r.categorie}
-                        </span>
-                      </td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:'#94a3b8', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{r.description || '—'}</td>
-                      <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ht)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tps)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(tvq)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:13, fontWeight:600, color:'#e2e8f0', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(ttc)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color: pourboire > 0 ? '#f59e0b' : '#334155', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{pourboire > 0 ? fmt(pourboire)+' $' : '—'}</td>
-                      <td style={{ padding:'10px 12px', fontSize:14, fontWeight:700, color:'#a5b4fc', fontFamily:"'DM Mono',monospace", whiteSpace:'nowrap' }}>{fmt(total)} $</td>
-                      <td style={{ padding:'10px 12px', fontSize:12, color:r.numero_projet ? '#a5b4fc' : '#334155', whiteSpace:'nowrap' }}>{r.numero_projet || '—'}</td>
-                      {isApprobateur && (
-                        <>
-                          <td style={{ padding:'10px 12px', fontSize:12, color:'#94a3b8', whiteSpace:'nowrap' }}>{r.employe_nom}</td>
-                          <td style={{ padding:'10px 12px', fontSize:12, color:'#64748b', whiteSpace:'nowrap' }}>{r.approbateur_nom || '—'}</td>
-                        </>
-                      )}
-                      <td style={{ padding:'10px 12px' }}>
-                        <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:20, fontSize:11, fontWeight:600, ...statStyle(r.statut), whiteSpace:'nowrap' }}>
-                          {r.statut}
-                        </span>
-                      </td>
-                      <td style={{ padding:'10px 12px', color:'#334155', fontSize:16 }}>›</td>
+                      {visibleColumns.map(col => (
+                        <td key={col.key} style={{ padding:cellPad, verticalAlign:'middle', ...(col.num ? num : {}) }}>
+                          {renderCell(col, r, t)}
+                        </td>
+                      ))}
+                      <td style={{ padding:'12px 12px 12px 0', color:'var(--text-3)', fontSize:18 }}>›</td>
                     </tr>
                   );
                 })}
@@ -816,6 +868,18 @@ export default function ReceiptsPage({ user, profile }) {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Menu « Colonnes » */}
+      {colsMenu && (
+        <ColumnsMenu
+          columns={availableColumns}
+          hiddenCols={hiddenCols}
+          anchor={colsMenu}
+          onChange={saveHiddenCols}
+          onReset={() => saveHiddenCols(defaultHiddenCols())}
+          onClose={() => setColsMenu(null)}
+        />
       )}
 
       {/* Menu de filtre ouvert */}

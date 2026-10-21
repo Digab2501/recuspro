@@ -11,9 +11,71 @@
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>ReçusPro</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+      // Applique le thème choisi (clair / sombre) avant l'affichage pour éviter un flash
+      (function () {
+        var t = 'dark';
+        try { t = localStorage.getItem('recuspro-theme') || 'dark'; } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+      })();
+    </script>
     <style>
+      /* ── Thème sombre (par défaut) ── */
+      :root, :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg:            #0f1117;
+        --sidebar:       #13161f;
+        --surface:       #1a1f2e;
+        --surface-2:     #232a3d;
+        --field:         rgba(255,255,255,.06);
+        --hover:         rgba(255,255,255,.045);
+        --row-alt:       rgba(255,255,255,.022);
+        --border:        rgba(255,255,255,.09);
+        --border-strong: rgba(255,255,255,.15);
+        --text:          #f1f5f9;
+        --text-2:        #cbd5e1;
+        --text-3:        #a0aec0;
+        --text-4:        #5f6e85;
+        --accent:        #818cf8;
+        --accent-text:   #a5b4fc;
+        --danger-text:   #f87171;
+        --success-text:  #34d399;
+        --warn-text:     #fbbf24;
+        --info-text:     #38bdf8;
+        --shadow:        rgba(0,0,0,.45);
+        --chip-mix:      #ffffff;
+        --scroll-thumb:  #3b475c;
+      }
+      /* ── Thème clair ── */
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg:            #f3f5f9;
+        --sidebar:       #ffffff;
+        --surface:       #ffffff;
+        --surface-2:     #eef1f8;
+        --field:         #ffffff;
+        --hover:         rgba(15,23,42,.045);
+        --row-alt:       rgba(15,23,42,.028);
+        --border:        rgba(15,23,42,.12);
+        --border-strong: rgba(15,23,42,.22);
+        --text:          #0f172a;
+        --text-2:        #334155;
+        --text-3:        #526077;
+        --text-4:        #a0aab8;
+        --accent:        #4f46e5;
+        --accent-text:   #4338ca;
+        --danger-text:   #c81e1e;
+        --success-text:  #047857;
+        --warn-text:     #b45309;
+        --info-text:     #0369a1;
+        --shadow:        rgba(15,23,42,.14);
+        --chip-mix:      #000000;
+        --scroll-thumb:  #c3cad6;
+      }
       * { box-sizing: border-box; margin: 0; padding: 0; }
-      body { background: #0f1117; color: #e2e8f0; font-family: 'DM Sans', sans-serif; }
+      body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; }
+      input, select, textarea { color: var(--text); }
+      select option { background: var(--surface); color: var(--text); }
     </style>
   </head>
   <body>
