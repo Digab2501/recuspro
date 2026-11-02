@@ -250,13 +250,36 @@ export default function ReceiptsPage({ user, profile }) {
   };
 
   const updateStatut = async (id, statut) => {
-    await supabase.from('receipts').update({
+    const approbateur_nom = `${profile.prenom} ${profile.nom}`;
+    const { error } = await supabase.from('receipts').update({
       statut,
       updated_by:      user.id,
-      approbateur_nom: `${profile.prenom} ${profile.nom}`,
+      approbateur_nom,
     }).eq('id', id);
-    setReceipts(prev => prev.map(r => r.id === id ? { ...r, statut } : r));
-    if (selected?.id === id) setSelected(s => ({ ...s, statut }));
+    if (error) { window.alert(`Erreur lors de la mise à jour du statut : ${error.message}`); return; }
+    setReceipts(prev => prev.map(r => r.id === id ? { ...r, statut, approbateur_nom } : r));
+    if (selected?.id === id) setSelected(s => ({ ...s, statut, approbateur_nom }));
+  };
+
+  // Approuver / rejeter plusieurs reçus cochés d'un coup
+  const updateStatutSelected = async (statut) => {
+    const ids = selectedRows.map(r => r.id);
+    if (ids.length === 0) return;
+    const verbe = statut === 'Approuvé' ? 'Approuver' : statut === 'Rejeté' ? 'Rejeter' : 'Remettre en attente';
+    if (!window.confirm(`${verbe} ${ids.length} reçu(s) ?`)) return;
+
+    const approbateur_nom = `${profile.prenom} ${profile.nom}`;
+    setBulkBusy(`Mise à jour de ${ids.length} reçu(s)…`);
+    const { data, error } = await supabase.from('receipts')
+      .update({ statut, updated_by: user.id, approbateur_nom })
+      .in('id', ids).select('id');
+    setBulkBusy('');
+
+    const doneIds = new Set((data || []).map(d => d.id));
+    setReceipts(prev => prev.map(r => doneIds.has(r.id) ? { ...r, statut, approbateur_nom } : r));
+    if (error) window.alert(`Erreur lors de la mise à jour : ${error.message}`);
+    else if (doneIds.size < ids.length) window.alert(`${ids.length - doneIds.size} reçu(s) n'ont pas pu être mis à jour.`);
+    else clearSelection();
   };
 
   const downloadCSV = () => {
@@ -657,9 +680,34 @@ export default function ReceiptsPage({ user, profile }) {
       case 'numero_projet': return r.numero_projet ? <span style={{ color:'var(--accent-text)', fontWeight:600, whiteSpace:'nowrap' }}>{r.numero_projet}</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
       case 'employe_nom':   return <span style={{ color:'var(--text)', whiteSpace:'nowrap' }}>{r.employe_nom || '—'}</span>;
       case 'approbateur_nom': return <span style={{ color:'var(--text-2)', whiteSpace:'nowrap' }}>{r.approbateur_nom || '—'}</span>;
-      case 'statut':        return <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap', ...statStyle(r.statut) }}>
-                                     <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor' }} />{r.statut}
-                                   </span>;
+      case 'statut': {
+        const pastille = (
+          <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap', ...statStyle(r.statut) }}>
+            <span style={{ width:7, height:7, borderRadius:'50%', background:'currentColor' }} />{r.statut}
+          </span>
+        );
+        if (!canApprove) return pastille;
+        const miniBtn = (cible, symbole, titre) => {
+          const actif = r.statut === cible;
+          return (
+            <button title={actif ? `Remettre « En attente »` : titre}
+              onClick={e => { e.stopPropagation(); updateStatut(r.id, actif ? 'En attente' : cible); }}
+              style={{ width:26, height:26, borderRadius:7, border:'1px solid', cursor:'pointer', fontSize:13, fontWeight:700, lineHeight:1, padding:0, fontFamily:'inherit',
+                background:  actif ? statStyle(cible).background : 'var(--hover)',
+                color:       actif ? statStyle(cible).color : 'var(--text-3)',
+                borderColor: actif ? `color-mix(in srgb, ${statStyle(cible).color} 45%, transparent)` : 'var(--border)' }}>
+              {symbole}
+            </button>
+          );
+        };
+        return (
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+            {pastille}
+            {miniBtn('Approuvé', '✓', 'Approuver')}
+            {miniBtn('Rejeté',   '✕', 'Rejeter')}
+          </div>
+        );
+      }
       default:              return null;
     }
   };
@@ -755,6 +803,18 @@ export default function ReceiptsPage({ user, profile }) {
             <span style={{ fontSize:15, fontWeight:700, color:'var(--accent-text)', fontVariantNumeric:'tabular-nums' }}>{fmt(selTotal)} $</span>
             {bulkBusy && <span style={{ fontSize:13, color:'var(--text-2)' }}>⏳ {bulkBusy}</span>}
             <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
+              {canApprove && (
+                <button disabled={!!bulkBusy} onClick={() => updateStatutSelected('Approuvé')}
+                  style={actionBtn('rgba(16,185,129,.15)', 'rgba(16,185,129,.45)', 'var(--success-text)')}>
+                  ✓ Approuver ({selectedRows.length})
+                </button>
+              )}
+              {canApprove && (
+                <button disabled={!!bulkBusy} onClick={() => updateStatutSelected('Rejeté')}
+                  style={actionBtn('rgba(239,68,68,.12)', 'rgba(239,68,68,.4)', 'var(--danger-text)')}>
+                  ✕ Rejeter ({selectedRows.length})
+                </button>
+              )}
               <button disabled={!!bulkBusy} onClick={downloadSelected}
                 style={actionBtn('rgba(99,102,241,.15)', 'rgba(99,102,241,.45)', 'var(--accent-text)')}>
                 ⬇ Télécharger les reçus (.zip)
