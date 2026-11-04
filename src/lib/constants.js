@@ -47,6 +47,16 @@ export const ROLE_COLORS = {
 // ─── Statuts ──────────────────────────────────────────────────────────────────
 export const STATUTS = ['En attente', 'Approuvé', 'Rejeté'];
 
+// ─── Cartes de paiement ───────────────────────────────────────────────────────
+// Seuls les employés listés ici choisissent une carte en soumettant un document
+// (les autres n'utilisent qu'une seule carte). Clé = courriel du compte.
+export const CARTES_PAR_EMPLOYE = {
+  'amichaud@incendieglb.com': ['AMEX PIA', 'AMEX GLB', 'VISA GLB'],
+};
+export const cartesDe = (email) => CARTES_PAR_EMPLOYE[String(email || '').toLowerCase()] || [];
+export const TOUTES_CARTES = [...new Set(Object.values(CARTES_PAR_EMPLOYE).flat())];
+export const CARTE_COULEURS = { 'AMEX PIA': '#2563eb', 'AMEX GLB': '#059669', 'VISA GLB': '#d97706' };
+
 // ─── Mois (pour le filtre) ────────────────────────────────────────────────────
 export const MOIS_LABELS = [
   'Janvier','Février','Mars','Avril','Mai','Juin',

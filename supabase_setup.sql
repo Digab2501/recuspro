@@ -117,3 +117,8 @@ CREATE TRIGGER receipts_updated_at
 -- ============================================================
 -- ✅ Configuration terminée !
 -- ============================================================
+
+-- ============================================================
+-- 6. Carte de paiement utilisée (ajout novembre 2026)
+-- ============================================================
+ALTER TABLE public.receipts ADD COLUMN IF NOT EXISTS carte TEXT;

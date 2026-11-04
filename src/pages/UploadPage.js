@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { SYSTEM_PROMPT_IMAGE, SYSTEM_PROMPT_TEXT } from '../lib/constants';
+import { SYSTEM_PROMPT_IMAGE, SYSTEM_PROMPT_TEXT, cartesDe } from '../lib/constants';
 import { getFileType, getFileIcon, ACCEPTED, generatePreview, imageToBase64, pdfToBase64Image, wordToText, excelToText } from '../lib/fileUtils';
 
 export default function UploadPage({ user, profile, onNavigate }) {
@@ -11,6 +11,9 @@ export default function UploadPage({ user, profile, onNavigate }) {
   const [cameraStream,    setCameraStream]    = useState(null);
   const [cameraFacing,    setCameraFacing]    = useState('environment');
   const [doneCount,       setDoneCount]       = useState(0);
+  const [carte,           setCarte]           = useState('');   // carte utilisée (seulement pour les employés à plusieurs cartes)
+  const mesCartes = cartesDe(profile.email || user.email);
+  const carteManquante = mesCartes.length > 0 && !carte;
 
   const videoRef      = useRef();
   const canvasRef     = useRef();
@@ -123,7 +126,7 @@ export default function UploadPage({ user, profile, onNavigate }) {
         const result    = await analyzeOne(item);
         const receiptId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const fileUrl   = await uploadFile(item.file, receiptId);
-        await supabase.from('receipts').insert({
+        const row = {
           id:            receiptId,
           user_id:       user.id,
           employe_nom:   `${profile.prenom} ${profile.nom}`,
@@ -147,7 +150,9 @@ export default function UploadPage({ user, profile, onNavigate }) {
           file_name:     item.file.name,
           preview_url: fileUrl,
           statut:        'En attente',
-        });
+        };
+        const { error } = await supabase.from('receipts').insert(mesCartes.length ? { ...row, carte } : row);
+        if (error) throw error;
         setDoneCount(c => c+1);
         setPendingFiles(prev => prev.map(p => p.id===item.id ? {...p,status:'done'} : p));
       } catch (err) {
@@ -252,6 +257,25 @@ export default function UploadPage({ user, profile, onNavigate }) {
 
       {pendingFiles.length>0 && (
         <div style={{background:'var(--surface)',borderRadius:16,border:'1px solid var(--border)',padding:24}}>
+          {mesCartes.length > 0 && (
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:13,color:'var(--text-2)',display:'block',marginBottom:6}}>💳 Carte utilisée <span style={{color:'var(--danger-text)'}}>*</span></label>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {mesCartes.map(c => (
+                  <button key={c} type="button" disabled={batchProcessing} onClick={() => setCarte(c)}
+                    style={{padding:'10px 18px',borderRadius:10,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',
+                      background: carte === c ? 'rgba(99,102,241,.18)' : 'var(--field)',
+                      border: `2px solid ${carte === c ? 'var(--accent)' : 'var(--border-strong)'}`,
+                      color: carte === c ? 'var(--accent-text)' : 'var(--text)'}}>
+                    {carte === c ? '✓ ' : ''}{c}
+                  </button>
+                ))}
+              </div>
+              <div style={{fontSize:12.5,color: carteManquante ? 'var(--warn-text)' : 'var(--text-3)',marginTop:6}}>
+                {carteManquante ? 'Choisissez la carte avant d\'envoyer.' : 'S\'applique à tous les documents de cet envoi.'}
+              </div>
+            </div>
+          )}
           <div style={{marginBottom:16}}>
             <label style={{fontSize:13,color:'var(--text-2)',display:'block',marginBottom:6}}>Note (optionnel)</label>
             <input value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex: Déplacement client, réunion de projet…"
@@ -261,8 +285,8 @@ export default function UploadPage({ user, profile, onNavigate }) {
             <span style={{fontSize:13,color:'var(--text-3)'}}>
               {batchProcessing ? `⟳ Traitement… ${doneCount}/${pendingFiles.length}` : `${pendingFiles.filter(p=>p.status==='pending').length} fichier(s) prêt(s)`}
             </span>
-            <button onClick={processAll} disabled={batchProcessing||pendingFiles.filter(p=>p.status==='pending').length===0}
-              style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',border:'none',borderRadius:10,padding:'13px 28px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:batchProcessing?.5:1,display:'flex',alignItems:'center',gap:10}}>
+            <button onClick={processAll} disabled={batchProcessing||carteManquante||pendingFiles.filter(p=>p.status==='pending').length===0}
+              style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',border:'none',borderRadius:10,padding:'13px 28px',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:(batchProcessing||carteManquante)?.5:1,display:'flex',alignItems:'center',gap:10}}>
               {batchProcessing && <div style={{width:15,height:15,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',animation:'spin .8s linear infinite'}}/>}
               ✨ Analyser et envoyer ({pendingFiles.filter(p=>p.status==='pending').length})
             </button>
