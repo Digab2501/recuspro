@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import { supabase } from '../lib/supabase';
 import { CATEGORIES, STATUTS, TPS_RATE, TVQ_RATE } from '../lib/constants';
@@ -58,6 +58,72 @@ const chipStyle = (color) => ({
   whiteSpace:'nowrap',
 });
 
+// ── Fenêtre de tri sur plusieurs niveaux (comme « Tri personnalisé » d'Excel) ──
+function SortDialog({ columns, sorts, onChange, onClose, anchor }) {
+  const left = Math.min(anchor.right - 440, window.innerWidth - 450);
+  const used = sorts.map(s => s.key);
+  const sel = { background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:8, color:'var(--text)', padding:'0 10px', height:36, fontSize:14, fontFamily:'inherit', cursor:'pointer' };
+  const update = (i, patch) => onChange(sorts.map((s, j) => j === i ? { ...s, ...patch } : s));
+  const move = (i, d) => { const n = [...sorts]; [n[i], n[i + d]] = [n[i + d], n[i]]; onChange(n); };
+  const addLevel = () => {
+    const next = columns.find(c => !used.includes(c.key));
+    if (next) onChange([...sorts, { key: next.key, dir: 'asc' }]);
+  };
+  return (
+    <>
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:999 }} />
+      <div style={{ position:'fixed', top:anchor.bottom + 6, left:Math.max(8, left), width:440, zIndex:1000,
+        background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:12, boxShadow:'0 12px 32px var(--shadow)', padding:14 }}>
+        <div style={{ fontSize:15, fontWeight:700, color:'var(--text)', marginBottom:4 }}>Trier</div>
+        <div style={{ fontSize:13, color:'var(--text-3)', marginBottom:12 }}>Le 1er niveau est prioritaire, les suivants départagent les égalités.</div>
+        {sorts.map((s, i) => {
+          const col = columns.find(c => c.key === s.key) || columns[0];
+          return (
+            <div key={i} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+              <span style={{ fontSize:13, fontWeight:600, color:'var(--text-2)', width:62 }}>{i === 0 ? 'Trier par' : 'Puis par'}</span>
+              <select value={s.key} onChange={e => update(i, { key: e.target.value })} style={{ ...sel, flex:1, minWidth:0 }}>
+                {columns.filter(c => c.key === s.key || !used.includes(c.key)).map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+              <select value={s.dir} onChange={e => update(i, { dir: e.target.value })} style={{ ...sel, width:120 }}>
+                <option value="asc">{col.num ? 'Petit → grand' : 'A → Z'}</option>
+                <option value="desc">{col.num ? 'Grand → petit' : 'Z → A'}</option>
+              </select>
+              <button title="Monter" disabled={i === 0} onClick={() => move(i, -1)}
+                style={{ ...sel, width:30, padding:0, opacity: i === 0 ? .35 : 1 }}>↑</button>
+              <button title="Descendre" disabled={i === sorts.length - 1} onClick={() => move(i, 1)}
+                style={{ ...sel, width:30, padding:0, opacity: i === sorts.length - 1 ? .35 : 1 }}>↓</button>
+              <button title="Supprimer ce niveau" disabled={sorts.length === 1} onClick={() => onChange(sorts.filter((_, j) => j !== i))}
+                style={{ ...sel, width:30, padding:0, color:'var(--danger-text)', opacity: sorts.length === 1 ? .35 : 1 }}>✕</button>
+            </div>
+          );
+        })}
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:12, gap:8 }}>
+          <button onClick={addLevel} disabled={used.length >= columns.length}
+            style={{ background:'rgba(99,102,241,.12)', border:'1px solid rgba(99,102,241,.4)', color:'var(--accent-text)', borderRadius:8, padding:'0 14px', height:36, fontSize:13.5, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            + Ajouter un niveau
+          </button>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={() => onChange(DEFAULT_SORTS)}
+              style={{ background:'var(--field)', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:8, padding:'0 12px', height:36, fontSize:13.5, cursor:'pointer', fontFamily:'inherit' }}>
+              Rétablir
+            </button>
+            <button onClick={onClose}
+              style={{ background:'linear-gradient(135deg,#6366f1,#8b5cf6)', border:'none', color:'#fff', borderRadius:8, padding:'0 16px', height:36, fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Tri par défaut : date la plus récente en premier
+const DEFAULT_SORTS = [{ key:'date', dir:'desc' }];
+
+// Texte normalisé pour la recherche (sans accents, minuscules)
+const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
 // ── Menu de choix des colonnes ──
 function ColumnsMenu({ columns, hiddenCols, onChange, onReset, onClose, anchor }) {
   const left = Math.min(anchor.right - 240, window.innerWidth - 250);
@@ -85,7 +151,7 @@ function ColumnsMenu({ columns, hiddenCols, onChange, onReset, onClose, anchor }
 }
 
 // ── Menu de filtre style Excel ──
-function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onClose, anchor }) {
+function ColumnFilterMenu({ col, rows, selectedVals, sortDir, onSort, onApply, onClose, anchor }) {
   const allValues = Array.from(new Set(rows.map(col.filterVal)));
   // Trie la liste des valeurs (numérique pour les montants)
   const sample = Object.fromEntries(rows.map(r => [col.filterVal(r), col.sortVal(r)]));
@@ -128,10 +194,10 @@ function ColumnFilterMenu({ col, rows, selectedVals, sort, onSort, onApply, onCl
         style={{ position:'fixed', top:anchor.bottom + 4, left: Math.max(8, left), width:280, zIndex:1000,
           background:'var(--surface-2)', border:'1px solid var(--border-strong)', borderRadius:10, boxShadow:'0 12px 32px var(--shadow)',
           padding:8, textTransform:'none', letterSpacing:0, fontWeight:400 }}>
-        <button style={menuBtn(sort.key === col.key && sort.dir === 'asc')}  onClick={() => onSort(col.key, 'asc')}>
+        <button style={menuBtn(sortDir === 'asc')}  onClick={() => onSort(col.key, 'asc')}>
           ↑ Trier {col.num ? 'du plus petit au plus grand' : 'de A à Z'}
         </button>
-        <button style={menuBtn(sort.key === col.key && sort.dir === 'desc')} onClick={() => onSort(col.key, 'desc')}>
+        <button style={menuBtn(sortDir === 'desc')} onClick={() => onSort(col.key, 'desc')}>
           ↓ Trier {col.num ? 'du plus grand au plus petit' : 'de Z à A'}
         </button>
         <div style={{ height:1, background:'var(--border)', margin:'6px 0' }} />
@@ -183,7 +249,27 @@ export default function ReceiptsPage({ user, profile }) {
   const [filterDateDe, setFilterDateDe] = useState('');
   const [filterDateA,  setFilterDateA]  = useState('');
   const [colFilters,   setColFilters]   = useState({});              // { colKey: [valeurs gardées] }
-  const [sort,         setSort]         = useState({ key:'date', dir:'desc' });
+  const [sorts,        setSorts]        = useState(DEFAULT_SORTS);   // niveaux de tri [{ key, dir }]
+  const [sortMenu,     setSortMenu]     = useState(null);            // position de la fenêtre « Trier »
+  const [search,       setSearch]       = useState('');              // recherche dans tout le tableau
+  const tableScrollRef = useRef(null);
+  const [tableTop,     setTableTop]     = useState(330);             // position du tableau dans la page
+
+  // Le tableau s'arrête au bas de l'écran : sa barre de défilement horizontale reste visible
+  // Recalculé à chaque affichage (le tableau bouge quand la barre de sélection apparaît, etc.) ;
+  // la mise à jour n'a lieu que si la position change vraiment, donc pas de boucle.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    const top = Math.round(el.getBoundingClientRect().top + window.scrollY);
+    setTableTop(prev => (Math.abs(top - prev) > 2 ? top : prev));
+  });
+  useEffect(() => {
+    const onResize = () => setTableTop(t => t + 0.001); // force un nouveau calcul
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [openMenu,     setOpenMenu]     = useState(null);            // { key, anchor }
   const [selectedIds,  setSelectedIds]  = useState(() => new Set());  // reçus cochés
   const [bulkBusy,     setBulkBusy]     = useState('');               // message pendant une action groupée
@@ -322,13 +408,28 @@ export default function ReceiptsPage({ user, profile }) {
     })
   );
 
-  // 3) Tri
-  const sortCol = COLUMNS.find(c => c.key === sort.key);
-  const filtered = applyColFilters(baseFiltered).sort((a, b) => {
-    if (!sortCol) return 0;
-    const va = sortCol.sortVal(a), vb = sortCol.sortVal(b);
-    const cmp = sortCol.num ? va - vb : String(va).localeCompare(String(vb), 'fr');
-    return sort.dir === 'asc' ? cmp : -cmp;
+  // 3) Recherche dans tout le tableau (chaque mot doit apparaître quelque part dans la ligne)
+  const searchWords = norm(search).split(/\s+/).filter(Boolean);
+  const matchesSearch = (r) => {
+    if (searchWords.length === 0) return true;
+    const t = calcTaxes(r);
+    const hay = norm([
+      ...COLUMNS.map(c => c.filterVal(r)),
+      r.description, r.notes, r.numero_facture,
+      t.ht.toFixed(2), t.total.toFixed(2), t.ttc.toFixed(2),
+    ].join(' | '));
+    return searchWords.every(w => hay.includes(w));
+  };
+
+  // 4) Tri sur plusieurs niveaux
+  const sortLevels = sorts.map(s => ({ ...s, col: COLUMNS.find(c => c.key === s.key) })).filter(s => s.col);
+  const filtered = applyColFilters(baseFiltered).filter(matchesSearch).sort((a, b) => {
+    for (const { col, dir } of sortLevels) {
+      const va = col.sortVal(a), vb = col.sortVal(b);
+      const cmp = col.num ? va - vb : String(va).localeCompare(String(vb), 'fr');
+      if (cmp !== 0) return dir === 'asc' ? cmp : -cmp;
+    }
+    return 0;
   });
 
   const activeColFilters = Object.values(colFilters).filter(Boolean).length;
@@ -430,9 +531,16 @@ export default function ReceiptsPage({ user, profile }) {
     }
   };
 
-  const clickHeader = (key) => setSort(s =>
-    s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir:'asc' }
-  );
+  const clickHeader = (key, addLevel) => setSorts(prev => {
+    const i = prev.findIndex(s => s.key === key);
+    const flip = (s) => ({ ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' });
+    if (addLevel) {
+      // Maj + clic : ajoute la colonne comme niveau suivant, ou inverse son sens si elle y est déjà
+      return i >= 0 ? prev.map((s, j) => j === i ? flip(s) : s) : [...prev, { key, dir:'asc' }];
+    }
+    // Clic simple : tri unique (comme Excel)
+    return prev.length === 1 && i === 0 ? [flip(prev[0])] : [{ key, dir:'asc' }];
+  });
 
   const totaux = filtered.reduce((acc, r) => {
     const { ht, tps, tvq, pourboire, total } = calcTaxes(r);
@@ -658,6 +766,7 @@ export default function ReceiptsPage({ user, profile }) {
   // VUE LISTE
   // ══════════════════════════════════════════════
   const num = { fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap', textAlign:'right' };
+  const thSticky = { position:'sticky', top:0, zIndex:3, background:'var(--surface-2)', borderBottom:'1px solid var(--border-strong)' };
   const cellPad = '12px 12px';
 
   // Contenu d'une cellule selon la colonne
@@ -714,10 +823,20 @@ export default function ReceiptsPage({ user, profile }) {
 
   const labelStyle = { fontSize:13, color:'var(--text-2)', fontWeight:600 };
   const selectStyle = { ...inputStyle, paddingRight:30, cursor:'pointer', minWidth:170 };
-  const hasTopFilters = filterDateDe || filterDateA || filterCat !== 'Toutes' || filterStat !== 'Tous';
+  const hasTopFilters = filterDateDe || filterDateA || filterCat !== 'Toutes' || filterStat !== 'Tous' || search;
+  const isDefaultSort = sorts.length === 1 && sorts[0].key === DEFAULT_SORTS[0].key && sorts[0].dir === DEFAULT_SORTS[0].dir;
 
   return (
     <div>
+      <style>{`
+        .recu-row > td { border-bottom: 1px solid var(--border); }
+        .table-scroll { scrollbar-width: auto; scrollbar-color: var(--scroll-thumb) var(--surface-2); }
+        .table-scroll::-webkit-scrollbar { width: 12px; height: 14px; }
+        .table-scroll::-webkit-scrollbar-track { background: var(--surface-2); }
+        .table-scroll::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 7px; border: 3px solid var(--surface-2); }
+        .table-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+        .table-scroll::-webkit-scrollbar-corner { background: var(--surface-2); }
+      `}</style>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:20, flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 style={{ fontSize:26, fontWeight:700, marginBottom:4, color:'var(--text)' }}>{isApprobateur ? 'Tous les reçus' : 'Mes reçus'}</h1>
@@ -733,6 +852,13 @@ export default function ReceiptsPage({ user, profile }) {
 
       {/* Barre de filtres : période, catégorie, statut, colonnes */}
       <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:12, padding:'14px 18px', marginBottom:16, display:'flex', gap:'12px 20px', flexWrap:'wrap', alignItems:'center' }}>
+        <div style={{ position:'relative', flex:'1 1 260px', maxWidth:380 }}>
+          <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:15, pointerEvents:'none', opacity:.75 }}>🔍</span>
+          <input type="search" value={search} onChange={e => setSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') setSearch(''); }}
+            placeholder="Rechercher dans tout le tableau…"
+            style={{ ...inputStyle, width:'100%', paddingLeft:38, borderColor: search ? 'rgba(99,102,241,.6)' : 'var(--border-strong)' }} />
+        </div>
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={labelStyle}>📅 Du</span>
           <input type="date" value={filterDateDe} onChange={e => setFilterDateDe(e.target.value)} style={inputStyle} />
@@ -755,11 +881,17 @@ export default function ReceiptsPage({ user, profile }) {
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8, flexWrap:'wrap' }}>
           {(hasTopFilters || activeColFilters > 0) && (
-            <button onClick={() => { setFilterDateDe(''); setFilterDateA(''); setFilterCat('Toutes'); setFilterStat('Tous'); setColFilters({}); }}
+            <button onClick={() => { setFilterDateDe(''); setFilterDateA(''); setFilterCat('Toutes'); setFilterStat('Tous'); setColFilters({}); setSearch(''); }}
               style={{ background:'rgba(239,68,68,.1)', border:'1px solid rgba(239,68,68,.3)', color:'var(--danger-text)', borderRadius:8, padding:'0 14px', height:38, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
               ✕ Effacer les filtres{activeColFilters > 0 ? ` (+${activeColFilters} colonne${activeColFilters > 1 ? 's' : ''})` : ''}
             </button>
           )}
+          <button onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); setSortMenu(m => m ? null : rect); }}
+            title="Trier sur plusieurs colonnes (astuce : Maj + clic sur un en-tête)"
+            style={{ background: isDefaultSort ? 'var(--field)' : 'rgba(99,102,241,.12)', border:'1px solid', borderColor: isDefaultSort ? 'var(--border-strong)' : 'rgba(99,102,241,.5)',
+              color: isDefaultSort ? 'var(--text)' : 'var(--accent-text)', borderRadius:8, padding:'0 14px', height:38, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            ⇅ Trier{sorts.length > 1 ? ` (${sorts.length} niveaux)` : ''}
+          </button>
           <button onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); setColsMenu(m => m ? null : rect); }}
             style={{ background:'var(--field)', border:'1px solid var(--border-strong)', color:'var(--text)', borderRadius:8, padding:'0 14px', height:38, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
             ☰ Colonnes
@@ -845,27 +977,35 @@ export default function ReceiptsPage({ user, profile }) {
         </div>
       ) : (
         <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14 }}>
+          {/* Hauteur limitée à l'écran : la barre de défilement horizontale reste toujours visible */}
+          <div ref={tableScrollRef} className="table-scroll" style={{ overflow:'auto', maxHeight:`max(320px, calc(100vh - ${Math.round(tableTop) + 24}px))` }}>
+            <table style={{ width:'100%', borderCollapse:'separate', borderSpacing:0, fontSize:14 }}>
               <thead>
-                <tr style={{ background:'var(--surface-2)', borderBottom:'1px solid var(--border-strong)' }}>
-                  <th style={{ padding:'10px 4px 10px 16px', width:20 }}>
+                <tr>
+                  <th style={{ ...thSticky, padding:'10px 4px 10px 16px', width:20 }}>
                     <input type="checkbox" title="Tout sélectionner"
                       checked={allChecked}
                       ref={el => { if (el) el.indeterminate = someChecked; }}
                       onChange={toggleAllRows}
                       style={{ cursor:'pointer', accentColor:'var(--accent)', width:16, height:16 }} />
                   </th>
-                  <th style={{ width:36 }} title="Document" />
+                  <th style={{ ...thSticky, width:36 }} title="Document" />
                   {visibleColumns.map(col => {
-                    const isSorted   = sort.key === col.key;
+                    const sortIdx    = sorts.findIndex(s => s.key === col.key);
+                    const isSorted   = sortIdx >= 0;
+                    const sortDir    = isSorted ? sorts[sortIdx].dir : null;
                     const isFiltered = !!colFilters[col.key];
                     return (
-                      <th key={col.key} style={{ padding:'11px 10px 11px 14px', textAlign: col.num ? 'right' : 'left', fontSize:12.5, fontWeight:700, color: isSorted || isFiltered ? 'var(--accent-text)' : 'var(--text-2)', whiteSpace:'nowrap' }}>
+                      <th key={col.key} style={{ ...thSticky, padding:'11px 10px 11px 14px', textAlign: col.num ? 'right' : 'left', fontSize:12.5, fontWeight:700, color: isSorted || isFiltered ? 'var(--accent-text)' : 'var(--text-2)', whiteSpace:'nowrap' }}>
                         <div style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
-                          <span onClick={() => clickHeader(col.key)} title={col.hint ? `${col.hint} — cliquer pour trier` : 'Cliquer pour trier'}
-                            style={{ cursor:'pointer', userSelect:'none' }}>
-                            {col.label}{isSorted ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : ''}
+                          <span onClick={e => clickHeader(col.key, e.shiftKey)}
+                            title={`${col.hint ? col.hint + ' — ' : ''}Clic : trier · Maj + clic : ajouter un niveau de tri`}
+                            style={{ cursor:'pointer', userSelect:'none', display:'inline-flex', alignItems:'center', gap:3 }}>
+                            {col.label}
+                            {isSorted && <span>{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                            {isSorted && sorts.length > 1 && (
+                              <span style={{ fontSize:10.5, fontWeight:800, background:'rgba(99,102,241,.2)', color:'var(--accent-text)', borderRadius:10, minWidth:16, height:16, display:'inline-grid', placeItems:'center', padding:'0 4px' }}>{sortIdx + 1}</span>
+                            )}
                           </span>
                           <button title="Filtrer"
                             onClick={e => {
@@ -880,15 +1020,15 @@ export default function ReceiptsPage({ user, profile }) {
                       </th>
                     );
                   })}
-                  <th style={{ width:24 }} />
+                  <th style={{ ...thSticky, width:24 }} />
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
                     <td colSpan={visibleColumns.length + 3} style={{ padding:32, textAlign:'center', fontSize:14, color:'var(--text-2)' }}>
-                      Aucun reçu ne correspond aux filtres de colonnes.{' '}
-                      <button onClick={() => setColFilters({})}
+                      {search ? <>Aucun reçu ne contient « {search} ».</> : 'Aucun reçu ne correspond aux filtres de colonnes.'}{' '}
+                      <button onClick={() => { setColFilters({}); setSearch(''); }}
                         style={{ background:'none', border:'none', color:'var(--accent-text)', cursor:'pointer', fontFamily:'inherit', fontSize:14, textDecoration:'underline' }}>
                         Effacer les filtres
                       </button>
@@ -901,7 +1041,8 @@ export default function ReceiptsPage({ user, profile }) {
                   const rowBg = isChecked ? 'rgba(99,102,241,.12)' : (idx % 2 === 1 ? 'var(--row-alt)' : 'transparent');
                   return (
                     <tr key={r.id} onClick={() => setSelected(r)}
-                      style={{ borderBottom:'1px solid var(--border)', cursor:'pointer', transition:'background .12s', background: rowBg }}
+                      className="recu-row"
+                      style={{ cursor:'pointer', transition:'background .12s', background: rowBg }}
                       onMouseEnter={e => e.currentTarget.style.background = isChecked ? 'rgba(99,102,241,.18)' : 'var(--hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = rowBg}>
                       <td onClick={e => { e.stopPropagation(); toggleRow(r.id); }}
@@ -930,6 +1071,17 @@ export default function ReceiptsPage({ user, profile }) {
         </div>
       )}
 
+      {/* Fenêtre « Trier » */}
+      {sortMenu && (
+        <SortDialog
+          columns={availableColumns}
+          sorts={sorts}
+          anchor={sortMenu}
+          onChange={setSorts}
+          onClose={() => setSortMenu(null)}
+        />
+      )}
+
       {/* Menu « Colonnes » */}
       {colsMenu && (
         <ColumnsMenu
@@ -951,9 +1103,9 @@ export default function ReceiptsPage({ user, profile }) {
             col={col}
             rows={applyColFilters(baseFiltered, col.key)}
             selectedVals={colFilters[col.key]}
-            sort={sort}
+            sortDir={sorts.length === 1 && sorts[0].key === col.key ? sorts[0].dir : null}
             anchor={openMenu.anchor}
-            onSort={(key, dir) => { setSort({ key, dir }); setOpenMenu(null); }}
+            onSort={(key, dir) => { setSorts([{ key, dir }]); setOpenMenu(null); }}
             onApply={(vals) => { setColFilters(f => ({ ...f, [col.key]: vals })); setOpenMenu(null); }}
             onClose={() => setOpenMenu(null)}
           />
