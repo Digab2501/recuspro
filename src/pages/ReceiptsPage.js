@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import JSZip from 'jszip';
 import { supabase } from '../lib/supabase';
+import { TOUTES_CARTES, CARTE_COULEURS, cartesDe } from '../lib/constants';
 import { CATEGORIES, STATUTS, TPS_RATE, TVQ_RATE } from '../lib/constants';
 import { getFileIcon } from '../lib/fileUtils';
 
@@ -33,6 +34,7 @@ const COLUMNS = [
   { key:'pourboire',       label:'Pourboire',   filterVal: r => calcTaxes(r).pourboire > 0 ? fmt(calcTaxes(r).pourboire) + ' $' : VIDE, sortVal: r => calcTaxes(r).pourboire, num:true },
   { key:'total',           label:'Total',       filterVal: r => fmt(calcTaxes(r).total) + ' $',   sortVal: r => calcTaxes(r).total,     num:true },
   { key:'numero_projet',   label:'N° Projet',   filterVal: r => r.numero_projet || VIDE,          sortVal: r => (r.numero_projet || '').toLowerCase() },
+  { key:'carte',           label:'Carte',       filterVal: r => r.carte || VIDE,                  sortVal: r => (r.carte || '').toLowerCase(), hint:'Carte de paiement' },
   { key:'employe_nom',     label:'Employé',     filterVal: r => r.employe_nom || VIDE,            sortVal: r => (r.employe_nom || '').toLowerCase(),     approbOnly:true },
   { key:'approbateur_nom', label:'Approbateur', filterVal: r => r.approbateur_nom || VIDE,        sortVal: r => (r.approbateur_nom || '').toLowerCase(), approbOnly:true, hidden:true },
   { key:'statut',          label:'Statut',      filterVal: r => r.statut || VIDE,                 sortVal: r => (r.statut || '').toLowerCase() },
@@ -276,6 +278,17 @@ export default function ReceiptsPage({ user, profile }) {
   const [hiddenCols,   setHiddenCols]   = useState(loadHiddenCols);   // colonnes masquées
   const [colsMenu,     setColsMenu]     = useState(null);             // position du menu « Colonnes »
 
+  // Cartes possibles pour un reçu : celles de l'employé qui l'a soumis
+  const [emailsParUser, setEmailsParUser] = useState({});
+  useEffect(() => {
+    supabase.from('profiles').select('id,email').then(({ data }) =>
+      setEmailsParUser(Object.fromEntries((data || []).map(p => [p.id, p.email]))));
+  }, []);
+  const cartesDuRecu = (r) => {
+    const liste = cartesDe(emailsParUser[r.user_id] || (r.user_id === user.id ? (profile.email || user.email) : ''));
+    return liste.length ? liste : (r.carte ? TOUTES_CARTES : []);
+  };
+
   const isAdmin       = profile.role === 'admin';
   const isApprobateur = profile.role === 'approbateur' || isAdmin;
   const canApprove    = isApprobateur;
@@ -321,6 +334,7 @@ export default function ReceiptsPage({ user, profile }) {
       numero_projet: editForm.numero_projet || '',
       categorie:     editForm.categorie,
       description:   editForm.description  || '',
+      ...(editForm.carte !== undefined ? { carte: editForm.carte || null } : {}),
     };
     await supabase.from('receipts').update(updates).eq('id', selected.id);
     setReceipts(prev => prev.map(r => r.id === selected.id ? { ...r, ...updates } : r));
@@ -370,10 +384,10 @@ export default function ReceiptsPage({ user, profile }) {
 
   const downloadCSV = () => {
     const rows = [
-      ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Pourboire','Avec Taxe','N° Projet','Devise','Employé','Approbateur','Statut'],
+      ['Date','Fournisseur','Catégorie','Descriptif','Hors Taxe','TPS','TVQ','Pourboire','Avec Taxe','N° Projet','Devise','Carte','Employé','Approbateur','Statut'],
       ...filtered.map(r => {
         const { ht, tps, tvq, ttc, pourboire } = calcTaxes(r);
-        return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(pourboire), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.employe_nom, r.approbateur_nom||'', r.statut];
+        return [r.date||'', r.fournisseur, r.categorie, r.description||'', fmt(ht), fmt(tps), fmt(tvq), fmt(pourboire), fmt(ttc), r.numero_projet||'', r.devise||'CAD', r.carte||'', r.employe_nom, r.approbateur_nom||'', r.statut];
       }),
     ];
     const csv = rows.map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -383,7 +397,7 @@ export default function ReceiptsPage({ user, profile }) {
     a.click();
   };
 
-  const availableColumns = COLUMNS.filter(c => !c.approbOnly || isApprobateur);
+  const availableColumns = COLUMNS.filter(c => (!c.approbOnly || isApprobateur) && (c.key !== 'carte' || isApprobateur || cartesDe(profile.email || user.email).length > 0));
   const visibleColumns   = availableColumns.filter(c => !hiddenCols.includes(c.key));
   const saveHiddenCols = (cols) => {
     setHiddenCols(cols);
@@ -504,6 +518,19 @@ export default function ReceiptsPage({ user, profile }) {
     if (notes.length) window.alert(notes.join('\n'));
   };
 
+  const assignCarteSelected = async (carte) => {
+    const ids = selectedRows.map(r => r.id);
+    if (ids.length === 0) return;
+    if (!window.confirm(`${carte ? `Inscrire la carte « ${carte} »` : 'Retirer la carte'} pour ${ids.length} reçu(s) ?`)) return;
+    setBulkBusy(`Mise à jour de ${ids.length} reçu(s)…`);
+    const { data, error } = await supabase.from('receipts').update({ carte: carte || null }).in('id', ids).select('id');
+    setBulkBusy('');
+    const doneIds = new Set((data || []).map(d => d.id));
+    setReceipts(prev => prev.map(r => doneIds.has(r.id) ? { ...r, carte: carte || null } : r));
+    if (error) window.alert(`Erreur lors de la mise à jour : ${error.message}`);
+    else if (doneIds.size < ids.length) window.alert(`${ids.length - doneIds.size} reçu(s) n'ont pas pu être mis à jour (droits).`);
+  };
+
   const deleteSelected = async () => {
     const deletable = selectedRows.filter(canDeleteRow);
     const blocked   = selectedRows.length - deletable.length;
@@ -587,6 +614,7 @@ export default function ReceiptsPage({ user, profile }) {
               numero_projet: selected.numero_projet || '',
               categorie:     selected.categorie,
               description:   selected.description  || '',
+              ...(cartesDuRecu(selected).length ? { carte: selected.carte || '' } : {}),
             });
             setEditing(true);
           }}
@@ -625,6 +653,16 @@ export default function ReceiptsPage({ user, profile }) {
                   {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{CATEGORIES[c].icon} {c}</option>)}
                 </select>
               </div>
+              {editForm.carte !== undefined && (
+                <div style={{ gridColumn:'1/-1' }}>
+                  <label style={{ fontSize:12.5, color:'var(--text-3)', display:'block', marginBottom:4 }}>💳 Carte utilisée</label>
+                  <select value={editForm.carte || ''} onChange={e => setEditForm(f => ({ ...f, carte: e.target.value }))}
+                    style={{ width:'100%', background:'var(--surface)', border:'1px solid var(--border-strong)', borderRadius:8, color:'var(--text)', padding:'9px 12px', fontFamily:'inherit', fontSize:13, outline:'none' }}>
+                    <option value="">— À préciser —</option>
+                    {cartesDuRecu(selected).map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ gridColumn:'1/-1' }}>
                 <label style={{ fontSize:12.5, color:'var(--text-3)', display:'block', marginBottom:4 }}>Descriptif</label>
                 <input value={editForm.description || ''} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
@@ -672,6 +710,7 @@ export default function ReceiptsPage({ user, profile }) {
             {[
               ['Catégorie',      `${cat.icon} ${selected.categorie}`],
               ['N° Projet',      selected.numero_projet    || '—'],
+              ...(cartesDuRecu(selected).length ? [['Carte', selected.carte || 'À préciser']] : []),
               ['Employé',        selected.employe_nom],
               ['Approbateur',    selected.approbateur_nom  || '—'],
               ['Date',           selected.date             || 'Non détectée'],
@@ -787,6 +826,12 @@ export default function ReceiptsPage({ user, profile }) {
       case 'pourboire':     return t.pourboire > 0 ? <span style={{ color:'var(--warn-text)', fontWeight:600 }}>{fmt(t.pourboire)} $</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
       case 'total':         return <span style={{ color:'var(--text)', fontWeight:700, fontSize:15 }}>{fmt(t.total)} $</span>;
       case 'numero_projet': return r.numero_projet ? <span style={{ color:'var(--accent-text)', fontWeight:600, whiteSpace:'nowrap' }}>{r.numero_projet}</span> : <span style={{ color:'var(--text-4)' }}>—</span>;
+      case 'carte': {
+        if (!r.carte) return <span style={{ color:'var(--text-4)' }}>—</span>;
+        const c = CARTE_COULEURS[r.carte] || '#6366f1';
+        return <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'4px 10px', borderRadius:20, fontSize:12.5, fontWeight:700, whiteSpace:'nowrap',
+          background:`color-mix(in srgb, ${c} 16%, transparent)`, color:`color-mix(in srgb, ${c} 75%, var(--chip-mix))`, border:`1px solid color-mix(in srgb, ${c} 35%, transparent)` }}>💳 {r.carte}</span>;
+      }
       case 'employe_nom':   return <span style={{ color:'var(--text)', whiteSpace:'nowrap' }}>{r.employe_nom || '—'}</span>;
       case 'approbateur_nom': return <span style={{ color:'var(--text-2)', whiteSpace:'nowrap' }}>{r.approbateur_nom || '—'}</span>;
       case 'statut': {
@@ -946,6 +991,14 @@ export default function ReceiptsPage({ user, profile }) {
                   style={actionBtn('rgba(239,68,68,.12)', 'rgba(239,68,68,.4)', 'var(--danger-text)')}>
                   ✕ Rejeter ({selectedRows.length})
                 </button>
+              )}
+              {canApprove && TOUTES_CARTES.length > 0 && (
+                <select disabled={!!bulkBusy} value="" onChange={e => { const v = e.target.value; if (v) assignCarteSelected(v === '__aucune' ? null : v); }}
+                  style={{ ...actionBtn('var(--field)', 'var(--border-strong)', 'var(--text)'), appearance:'auto' }}>
+                  <option value="">💳 Inscrire la carte…</option>
+                  {TOUTES_CARTES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="__aucune">Retirer la carte</option>
+                </select>
               )}
               <button disabled={!!bulkBusy} onClick={downloadSelected}
                 style={actionBtn('rgba(99,102,241,.15)', 'rgba(99,102,241,.45)', 'var(--accent-text)')}>
