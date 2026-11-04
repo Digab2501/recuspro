@@ -978,7 +978,7 @@ export default function ReceiptsPage({ user, profile }) {
       ) : (
         <div style={{ background:'var(--surface)', borderRadius:14, border:'1px solid var(--border)', overflow:'hidden' }}>
           {/* Hauteur limitée à l'écran : la barre de défilement horizontale reste toujours visible */}
-          <div ref={tableScrollRef} className="table-scroll" style={{ overflow:'auto', maxHeight:`max(320px, calc(100vh - ${Math.round(tableTop) + 24}px))` }}>
+          <div ref={tableScrollRef} className="table-scroll" style={{ overflowX:'scroll', overflowY:'auto', maxHeight:`max(320px, calc(100vh - ${Math.round(tableTop) + 24}px))` }}>
             <table style={{ width:'100%', borderCollapse:'separate', borderSpacing:0, fontSize:14 }}>
               <thead>
                 <tr>
