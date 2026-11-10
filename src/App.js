@@ -8,12 +8,26 @@ import AdminPage     from './pages/AdminPage';
 import { ROLE_LABELS, ROLE_COLORS } from './lib/constants';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 
+// Lu dès le chargement, avant que Supabase ne nettoie l'adresse
+const INITIAL_HASH   = window.location.hash || '';
+const INITIAL_SEARCH = window.location.search || '';
+const ARRIVED_FOR_RECOVERY = /type=(recovery|invite)/.test(INITIAL_HASH + INITIAL_SEARCH);
+// Lien expiré / déjà utilisé : Supabase renvoie #error=...&error_code=otp_expired
+const AUTH_LINK_ERROR = (() => {
+  const p = new URLSearchParams((INITIAL_HASH.startsWith('#') ? INITIAL_HASH.slice(1) : INITIAL_HASH) || INITIAL_SEARCH.slice(1));
+  const code = p.get('error_code') || p.get('error');
+  if (!code) return '';
+  if (/otp_expired|expired|invalid/i.test(code + ' ' + (p.get('error_description') || '')))
+    return "Ce lien n'est plus valide : il a expiré ou a déjà été utilisé. Entrez votre courriel ci-dessous dans « Mot de passe oublié ? » pour recevoir un nouveau lien, et ouvrez-le dès sa réception.";
+  return `Le lien n'a pas pu être utilisé (${(p.get('error_description') || code).replace(/\+/g, ' ')}). Demandez un nouveau lien.`;
+})();
+
 export default function App() {
   const [session,  setSession]  = useState(null);
   const [profile,  setProfile]  = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [page,     setPage]     = useState('dashboard');
-  const [isResetting, setIsResetting] = useState(false);
+  const [isResetting, setIsResetting] = useState(ARRIVED_FOR_RECOVERY);
   const [theme, setTheme] = useState(() => document.documentElement.getAttribute('data-theme') || 'dark');
 
   // Applique et mémorise le thème clair / sombre
@@ -26,16 +40,15 @@ export default function App() {
   const toggleTheme = () => setTheme(t => (t === 'light' ? 'dark' : 'light'));
 
   useEffect(() => {
-    const hash = window.location.hash;
-if (hash.includes('type=recovery')) {
-  setIsResetting(true);
-}
+    if (AUTH_LINK_ERROR) window.history.replaceState(null, '', window.location.pathname);
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) loadProfile(session.user.id);
       else setLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Arrivée par le lien « Mot de passe oublié » : afficher le formulaire de nouveau mot de passe
+      if (event === 'PASSWORD_RECOVERY') setIsResetting(true);
       setSession(session);
       if (session) loadProfile(session.user.id);
       else { setProfile(null); setLoading(false); }
@@ -73,8 +86,13 @@ if (hash.includes('type=recovery')) {
   };
 
   if (isResetting) return (
-  <ResetPasswordPage onDone={() => { setIsResetting(false); window.location.hash = ''; }} />
-);
+    <ResetPasswordPage
+      session={session}
+      checking={loading}
+      onDone={() => { setIsResetting(false); window.history.replaceState(null, '', window.location.pathname); }}
+      onCancel={async () => { setIsResetting(false); window.history.replaceState(null, '', window.location.pathname); await supabase.auth.signOut(); }}
+    />
+  );
   if (loading) return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'grid', placeItems: 'center' }}>
       <div style={{ textAlign: 'center' }}>
@@ -85,7 +103,7 @@ if (hash.includes('type=recovery')) {
     </div>
   );
 
-  if (!session || !profile) return <LoginPage />;
+  if (!session || !profile) return <LoginPage linkError={AUTH_LINK_ERROR} />;
 
   const isAdmin        = profile.role === 'admin';
   const isApprobateur  = profile.role === 'approbateur' || isAdmin;
