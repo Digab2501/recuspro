@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function LoginPage() {
+export default function LoginPage({ linkError = '' }) {
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
-  const [mode,     setMode]     = useState('login'); // login | forgot
+  const [error,    setError]    = useState(linkError);
+  const [mode,     setMode]     = useState(linkError ? 'forgot' : 'login'); // login | forgot
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -21,11 +21,13 @@ export default function LoginPage() {
   const handleForgot = async (e) => {
     e.preventDefault();
     setLoading(true); setError('');
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: window.location.origin,
     });
-    if (error) setError(error.message);
-    else setError('✅ Email de réinitialisation envoyé !');
+    if (error) setError(/rate|seconds|too many/i.test(error.message)
+      ? 'Trop de demandes en peu de temps. Attendez une minute, puis réessayez.'
+      : error.message);
+    else setError("✅ Courriel envoyé ! Ouvrez le lien « Réinitialiser le mot de passe » dès sa réception (il expire après 1 heure et ne fonctionne qu'une fois). Vérifiez aussi les courriels indésirables.");
     setLoading(false);
   };
 
@@ -41,8 +43,13 @@ export default function LoginPage() {
 
         <div style={{ background:'var(--surface)', borderRadius:20, border:'1px solid var(--border)', padding:32 }}>
           <h2 style={{ fontSize:18, fontWeight:700, marginBottom:24 }}>
-            {mode === 'login' ? 'Connexion' : 'Mot de passe oublié'}
+            {mode === 'login' ? 'Connexion' : 'Créer ou réinitialiser mon mot de passe'}
           </h2>
+          {mode === 'forgot' && (
+            <p style={{ fontSize:13.5, color:'var(--text-2)', marginTop:-14, marginBottom:20, lineHeight:1.5 }}>
+              Entrez votre courriel : vous recevrez un lien pour choisir votre mot de passe.
+            </p>
+          )}
 
           <form onSubmit={mode === 'login' ? handleLogin : handleForgot}>
             <div style={{ marginBottom:16 }}>
@@ -74,13 +81,13 @@ export default function LoginPage() {
             <button type="submit" disabled={loading}
               style={{ width:'100%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', border:'none', borderRadius:10, padding:'13px', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'inherit', opacity: loading ? .6 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
               {loading && <div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin .8s linear infinite' }} />}
-              {mode === 'login' ? 'Se connecter' : 'Envoyer le lien'}
+              {mode === 'login' ? 'Se connecter' : 'Recevoir le lien pour créer mon mot de passe'}
             </button>
           </form>
 
           <div style={{ textAlign:'center', marginTop:16 }}>
             {mode === 'login'
-              ? <button onClick={()=>setMode('forgot')} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>Mot de passe oublié ?</button>
+              ? <button onClick={()=>setMode('forgot')} style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>Première connexion ou mot de passe oublié ?</button>
               : <button onClick={()=>setMode('login')}  style={{ background:'none', border:'none', color:'var(--accent)', cursor:'pointer', fontSize:13, fontFamily:'inherit' }}>← Retour à la connexion</button>
             }
           </div>
