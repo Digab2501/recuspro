@@ -9,7 +9,9 @@ const traduire = (msg = '') => {
   return msg;
 };
 
-export default function ResetPasswordPage({ session, checking, onDone, onCancel }) {
+export default function ResetPasswordPage({ session, checking, tokenHash = '', linkType = 'recovery', onDone, onCancel }) {
+  const [verifying,   setVerifying]   = useState(false);
+  const [tokenFailed, setTokenFailed] = useState(false);
   const [password,  setPassword]  = useState('');
   const [password2, setPassword2] = useState('');
   const [show,      setShow]      = useState(false);
@@ -28,16 +30,36 @@ export default function ResetPasswordPage({ session, checking, onDone, onCancel 
     setLoading(false);
   };
 
+  // Valide le jeton seulement quand l'employé clique (les robots des courriels ne cliquent pas sur les boutons)
+  const handleContinue = async () => {
+    setVerifying(true); setError('');
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: linkType });
+    if (error) setTokenFailed(true);
+    window.history.replaceState(null, '', window.location.pathname); // retire le jeton de l'adresse
+    setVerifying(false);
+  };
+
   const inp = { width:'100%', background:'var(--field)', border:'1px solid var(--border-strong)', borderRadius:10, color:'var(--text)', padding:'12px 16px', fontFamily:'inherit', fontSize:14, outline:'none', marginBottom:12, boxSizing:'border-box' };
-  const lienInvalide = !checking && !session;
+  const attendClic   = !checking && !session && tokenHash && !tokenFailed;
+  const lienInvalide = !checking && !session && !attendClic;
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg)', display:'grid', placeItems:'center', padding:20 }}>
       <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:20, padding:40, width:'100%', maxWidth:420 }}>
         <h2 style={{ fontSize:22, fontWeight:700, marginBottom:8, color:'var(--text)' }}>Choisir mon mot de passe</h2>
 
-        {checking ? (
+        {checking || verifying ? (
           <p style={{ color:'var(--text-2)', fontSize:14 }}>Vérification du lien…</p>
+        ) : attendClic ? (
+          <>
+            <p style={{ color:'var(--text-2)', fontSize:14, marginBottom:20, lineHeight:1.5 }}>
+              Cliquez sur « Continuer » pour choisir votre mot de passe.
+            </p>
+            <button onClick={handleContinue}
+              style={{ width:'100%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', border:'none', borderRadius:10, padding:'13px', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+              Continuer
+            </button>
+          </>
         ) : lienInvalide ? (
           <>
             <p style={{ color:'var(--danger-text)', fontSize:14, marginBottom:20, lineHeight:1.5 }}>
